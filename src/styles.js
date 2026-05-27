@@ -1,13 +1,16 @@
 export const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body, button, input, select, textarea {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.005em;
+}
 .rq-fade { animation: rqFade .35s ease both; }
 @keyframes rqFade { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:none;} }
 .rq-press { transition: transform .12s ease; cursor: pointer; }
 .rq-press:active { transform: scale(.96); }
 .rq-toast { animation: rqToast .3s ease both; }
 @keyframes rqToast { from { opacity:0; transform: translate(-50%, 12px);} to {opacity:1; transform: translate(-50%,0);} }
-input, select, textarea { font-family: 'Nunito', sans-serif; }
 ::-webkit-scrollbar { width: 0; }
 
 /* confetti */
@@ -32,7 +35,7 @@ input, select, textarea { font-family: 'Nunito', sans-serif; }
   position: fixed; top: 30%; left: 50%; transform: translateX(-50%);
   background: linear-gradient(135deg, var(--gold), #FFA800);
   color: var(--ink); padding: 20px 26px; border-radius: 22px;
-  font-family: 'Fredoka', sans-serif; font-weight: 700; text-align: center;
+  font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; text-align: center;
   box-shadow: 0 16px 38px rgba(0,0,0,.28); z-index: 180;
   animation: rqBadgePop .55s cubic-bezier(.2,1.3,.6,1) both, rqBadgeOut .4s ease 2.3s both;
   max-width: 84%;
@@ -50,14 +53,18 @@ input, select, textarea { font-family: 'Nunito', sans-serif; }
 
 export const S = {
   app: {
-    "--bg": "#FFF1E0", "--card": "#FFFFFF", "--ink": "#2E1F4A",
-    "--mute": "#9C8FA8", "--line": "#F0DDC8", "--mint": "#5DD3AB",
-    "--gold": "#FFB627", "--coral": "#FF6B47", "--lav": "#B98EF0",
-    "--peach": "#FFAE73", "--berry": "#E45BA0", "--sky": "#5BB3F0",
-    maxWidth: 460, margin: "0 auto", minHeight: "100vh",
+    "--bg": "#F4EFE9", "--card": "#FFFFFF", "--ink": "#1A1426",
+    "--mute": "#7E7488", "--line": "#E5DDD3", "--mint": "#3FCFA0",
+    "--gold": "#FF9F1C", "--coral": "#FF5C4D", "--lav": "#9D6FE8",
+    "--peach": "#FF9466", "--berry": "#E04891", "--sky": "#3FA3F0",
+    "--soft": "#FAF6F0",
+    maxWidth: 480, margin: "0 auto", minHeight: "100vh",
     background: "var(--bg)", color: "var(--ink)",
-    fontFamily: "'Nunito', sans-serif", display: "flex", flexDirection: "column",
-    position: "relative", paddingBottom: 78,
+    fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    display: "flex", flexDirection: "column",
+    position: "relative",
+    paddingBottom: "calc(78px + env(safe-area-inset-bottom))",
+    paddingTop: "env(safe-area-inset-top)",
   },
   loading: {
     minHeight: "60vh", display: "flex", flexDirection: "column",
@@ -69,7 +76,7 @@ export const S = {
     padding: "20px 20px 14px",
   },
   brand: { display: "flex", alignItems: "center", gap: 7 },
-  brandName: { fontFamily: "'Fredoka', sans-serif", fontWeight: 700, fontSize: 21, color: "var(--ink)" },
+  brandName: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em" },
   whoami: { fontSize: 12, color: "var(--mute)", display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontWeight: 600 },
   pointsBadge: {
     display: "flex", alignItems: "center", gap: 4,
@@ -78,22 +85,22 @@ export const S = {
     padding: "10px 15px", borderRadius: 18,
     boxShadow: "0 5px 0 rgba(255,107,71,.4)",
   },
-  pointsNum: { fontFamily: "'Fredoka', sans-serif", fontWeight: 700, fontSize: 20, color: "#fff" },
+  pointsNum: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: 20, color: "#fff" },
   pointsLabel: { fontSize: 12, fontWeight: 800, color: "#fff", opacity: 0.9 },
   main: { flex: 1, padding: "4px 20px 20px" },
-  h2: { fontFamily: "'Fredoka', sans-serif", fontSize: 24, margin: "8px 0 16px" },
-  h3: { fontFamily: "'Fredoka', sans-serif", fontSize: 16, margin: "24px 0 10px", color: "var(--ink)" },
+  h2: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 800, margin: "8px 0 16px", letterSpacing: "-0.025em" },
+  h3: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, fontWeight: 800, margin: "24px 0 10px", color: "var(--ink)", letterSpacing: "-0.01em", textTransform: "uppercase", opacity: 0.55 },
 
   heroCard: {
-    background: "linear-gradient(135deg, var(--coral) 0%, var(--berry) 60%, var(--lav) 100%)",
-    borderRadius: 24, padding: 22, color: "#fff",
-    boxShadow: "0 12px 28px rgba(228,91,160,.35)",
+    background: "linear-gradient(135deg, #FF5C4D 0%, #E04891 50%, #9D6FE8 100%)",
+    borderRadius: 26, padding: 24, color: "#fff",
+    boxShadow: "0 14px 36px rgba(224,72,145,.35), inset 0 1px 0 rgba(255,255,255,.2)",
     position: "relative", overflow: "hidden",
   },
   heroTop: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   heroLabel: { fontSize: 12, fontWeight: 700, opacity: 0.85, letterSpacing: 0.5, textTransform: "uppercase" },
   heroEmoji: { fontSize: 26 },
-  heroReward: { fontFamily: "'Fredoka', sans-serif", fontSize: 21, margin: "6px 0 14px" },
+  heroReward: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 21, margin: "6px 0 14px" },
   progressTrack: { background: "rgba(255,255,255,.32)", height: 12, borderRadius: 8, overflow: "hidden" },
   progressFill: { height: "100%", background: "var(--gold)", borderRadius: 8, transition: "width .5s ease" },
   heroFoot: { fontSize: 13, fontWeight: 700, marginTop: 9, opacity: 0.95 },
@@ -103,7 +110,7 @@ export const S = {
     flex: 1, background: "var(--card)", borderRadius: 16, padding: "13px 6px",
     textAlign: "center", border: "1px solid var(--line)",
   },
-  statNum: { fontFamily: "'Fredoka', sans-serif", fontSize: 21, color: "var(--ink)" },
+  statNum: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 21, color: "var(--ink)" },
   statLabel: { fontSize: 10, color: "var(--mute)", fontWeight: 700, marginTop: 2 },
 
   shortcut: {
@@ -115,7 +122,7 @@ export const S = {
     width: 42, height: 42, borderRadius: 13, display: "flex",
     alignItems: "center", justifyContent: "center", flexShrink: 0,
   },
-  shortcutTitle: { fontFamily: "'Fredoka', sans-serif", fontSize: 15.5 },
+  shortcutTitle: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15.5 },
   shortcutSub: { fontSize: 12, color: "var(--mute)", fontWeight: 600 },
 
   pendingNote: {
@@ -131,7 +138,7 @@ export const S = {
 
   sectionTag: {
     display: "flex", alignItems: "center", gap: 7,
-    fontFamily: "'Fredoka', sans-serif", fontSize: 14.5, marginBottom: 3,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14.5, marginBottom: 3,
   },
   sectionHint: { fontSize: 12.5, color: "var(--mute)", fontWeight: 600, margin: "0 0 12px" },
   tierDot: { width: 11, height: 11, borderRadius: 4, display: "inline-block" },
@@ -146,13 +153,13 @@ export const S = {
   taskLabel: { fontWeight: 700, fontSize: 14.5 },
   strike: { textDecoration: "line-through", color: "var(--mute)" },
   taskPts: {
-    fontFamily: "'Fredoka', sans-serif", fontSize: 14, color: "var(--ink)",
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, color: "var(--ink)",
     background: "#EAF5EE", padding: "5px 11px", borderRadius: 9, flexShrink: 0,
   },
   proofBtn: {
     display: "flex", alignItems: "center", gap: 5, background: "var(--mint)",
     color: "var(--ink)", border: "none", borderRadius: 11, padding: "9px 12px",
-    fontFamily: "'Fredoka', sans-serif", fontWeight: 600, fontSize: 13,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 13,
     boxShadow: "0 3px 0 #59BD98", flexShrink: 0,
   },
   decisionRow: {
@@ -164,7 +171,7 @@ export const S = {
   decisionMain: { flex: 1, textAlign: "left" },
   decisionLabel: { fontWeight: 700, fontSize: 14.5 },
   decisionPts: {
-    fontFamily: "'Fredoka', sans-serif", fontSize: 15, color: "var(--ink)",
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, color: "var(--ink)",
     background: "var(--gold)", padding: "5px 12px", borderRadius: 10, flexShrink: 0,
   },
   pendingTag: { fontSize: 11.5, color: "var(--mute)", fontWeight: 700, marginTop: 3, display: "block" },
@@ -180,7 +187,7 @@ export const S = {
     borderRadius: 18, padding: 16, marginBottom: 14,
   },
   promptKicker: { fontSize: 11, fontWeight: 800, color: "var(--coral)", letterSpacing: 0.6, textTransform: "uppercase" },
-  promptText: { fontFamily: "'Fredoka', sans-serif", fontSize: 17, margin: "7px 0 12px", lineHeight: 1.35 },
+  promptText: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, margin: "7px 0 12px", lineHeight: 1.35 },
   promptSwap: {
     display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700,
     background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10,
@@ -200,13 +207,13 @@ export const S = {
   primaryBtn: {
     flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
     background: "var(--ink)", color: "#fff", border: "none", borderRadius: 15,
-    padding: "15px", fontFamily: "'Fredoka', sans-serif", fontSize: 15.5, fontWeight: 600,
+    padding: "15px", fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15.5, fontWeight: 600,
     boxShadow: "0 5px 0 #271C36", width: "100%",
   },
   ghostBtn: {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
     background: "var(--card)", color: "var(--ink)", border: "1.5px solid var(--line)",
-    borderRadius: 15, padding: "15px 18px", fontFamily: "'Fredoka', sans-serif",
+    borderRadius: 15, padding: "15px 18px", fontFamily: "'Plus Jakarta Sans', sans-serif",
     fontSize: 14.5, fontWeight: 600,
   },
   videoNote: {
@@ -232,7 +239,7 @@ export const S = {
   rewardCost: { fontSize: 12.5, color: "var(--mute)", fontWeight: 700, marginTop: 1 },
   redeemBtn: {
     background: "var(--mint)", color: "var(--ink)", border: "none",
-    fontFamily: "'Fredoka', sans-serif", fontWeight: 600, fontSize: 13.5,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 13.5,
     padding: "10px 16px", borderRadius: 12, boxShadow: "0 4px 0 #59BD98",
   },
   redeemLocked: { background: "var(--line)", boxShadow: "0 4px 0 #D6C8BB", color: "var(--mute)" },
@@ -253,7 +260,7 @@ export const S = {
   modeBtn: {
     flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
     background: "var(--card)", border: "1.5px solid var(--line)", borderRadius: 12,
-    padding: "10px 8px", fontFamily: "'Fredoka', sans-serif", fontWeight: 600, fontSize: 12.5,
+    padding: "10px 8px", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 12.5,
     color: "var(--mute)", minWidth: 100,
   },
   modeActive: { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" },
@@ -265,7 +272,7 @@ export const S = {
   approveBtn: {
     display: "flex", alignItems: "center", gap: 5, background: "var(--mint)",
     color: "var(--ink)", border: "none", borderRadius: 11, padding: "11px 13px",
-    fontFamily: "'Fredoka', sans-serif", fontWeight: 600, fontSize: 13,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 13,
     boxShadow: "0 4px 0 #59BD98",
   },
   declineBtn: {
@@ -288,7 +295,7 @@ export const S = {
     border: "1px solid var(--line)", borderRadius: 12, padding: "9px 11px", marginBottom: 7,
   },
   itemPts: {
-    fontFamily: "'Fredoka', sans-serif", fontSize: 13, color: "var(--ink)",
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, color: "var(--ink)",
     background: "var(--bg)", padding: "3px 8px", borderRadius: 8, flexShrink: 0,
   },
   tierBadge: {
@@ -350,7 +357,7 @@ export const S = {
     padding: "30px 22px", display: "flex", flexDirection: "column", gap: 14,
   },
   authBrand: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },
-  authH1: { fontFamily: "'Fredoka', sans-serif", fontSize: 28, margin: "8px 0 4px" },
+  authH1: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, margin: "8px 0 4px" },
   authSub: { fontSize: 13.5, color: "var(--mute)", fontWeight: 600, marginBottom: 10 },
   authInput: {
     width: "100%", border: "1.5px solid var(--line)", borderRadius: 12,
@@ -422,37 +429,38 @@ export const S = {
 
   /* ===== Parent Home (the new warm landing) ===== */
   parentGreeting: {
-    background: "linear-gradient(135deg, #FFB627 0%, #FF6B47 70%, #E45BA0 110%)",
-    borderRadius: 26, padding: "22px 22px 26px", color: "#fff",
-    boxShadow: "0 14px 32px rgba(255,107,71,.32)",
+    background: "linear-gradient(135deg, #FF9F1C 0%, #FF5C4D 55%, #E04891 110%)",
+    borderRadius: 28, padding: "24px 22px 28px", color: "#fff",
+    boxShadow: "0 16px 38px rgba(255,92,77,.32), inset 0 1px 0 rgba(255,255,255,.22)",
     position: "relative", overflow: "hidden",
   },
   parentGreetDate: {
-    fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase",
-    opacity: 0.85, marginBottom: 4,
+    fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase",
+    opacity: 0.9, marginBottom: 6,
   },
   parentGreetH: {
-    fontFamily: "'Fredoka', sans-serif", fontSize: 26, lineHeight: 1.15,
-    margin: "2px 0 8px",
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 28,
+    lineHeight: 1.1, letterSpacing: "-0.025em", margin: "2px 0 10px",
   },
-  parentGreetSub: { fontSize: 14, fontWeight: 700, opacity: 0.95, lineHeight: 1.45 },
+  parentGreetSub: { fontSize: 14.5, fontWeight: 600, opacity: 0.95, lineHeight: 1.45 },
 
   weekBand: {
     display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9,
     marginTop: 16, marginBottom: 16,
   },
   weekCard: {
-    background: "var(--card)", borderRadius: 18, padding: "13px 8px",
+    background: "var(--card)", borderRadius: 20, padding: "14px 8px",
     border: "1px solid var(--line)", textAlign: "center",
-    boxShadow: "0 3px 0 var(--line)",
+    boxShadow: "0 2px 0 var(--line), 0 4px 16px rgba(0,0,0,.03)",
   },
   weekCardEmoji: { fontSize: 22, marginBottom: 4 },
-  weekCardNum: { fontFamily: "'Fredoka', sans-serif", fontSize: 20, color: "var(--ink)" },
-  weekCardLabel: { fontSize: 10, color: "var(--mute)", fontWeight: 800, marginTop: 1 },
+  weekCardNum: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em" },
+  weekCardLabel: { fontSize: 10.5, color: "var(--mute)", fontWeight: 700, marginTop: 1, letterSpacing: 0.3 },
 
   blockTitle: {
-    fontFamily: "'Fredoka', sans-serif", fontSize: 17,
-    margin: "22px 0 10px", display: "flex", alignItems: "center", gap: 7,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 13.5,
+    margin: "24px 0 12px", display: "flex", alignItems: "center", gap: 8,
+    textTransform: "uppercase", letterSpacing: 0.8, color: "var(--mute)",
   },
 
   /* latest video preview card */
@@ -497,12 +505,12 @@ export const S = {
   latelyLabel: { fontWeight: 700, fontSize: 13.5, lineHeight: 1.3 },
   latelyMeta: { fontSize: 11, color: "var(--mute)", fontWeight: 700, marginTop: 3 },
   latelyPts: {
-    fontFamily: "'Fredoka', sans-serif", fontSize: 13, color: "var(--ink)",
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, color: "var(--ink)",
     background: "linear-gradient(135deg, var(--mint), #88E5C2)", padding: "5px 11px",
     borderRadius: 10, flexShrink: 0, fontWeight: 600,
   },
   latelyPtsDeclined: {
-    fontFamily: "'Fredoka', sans-serif", fontSize: 13, color: "#B5503A",
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, color: "#B5503A",
     background: "#FFE6E0", padding: "5px 11px", borderRadius: 10, flexShrink: 0, fontWeight: 600,
   },
 
@@ -510,7 +518,7 @@ export const S = {
   onARoll: {
     background: "linear-gradient(135deg, var(--mint), var(--sky))",
     color: "#fff", borderRadius: 18, padding: "13px 16px",
-    fontFamily: "'Fredoka', sans-serif", fontWeight: 600, fontSize: 14,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14,
     display: "flex", alignItems: "center", gap: 10, marginTop: 14,
     boxShadow: "0 8px 22px rgba(93,211,171,.32)",
   },
@@ -519,27 +527,29 @@ export const S = {
   shortcutBright: {
     width: "100%", display: "flex", alignItems: "center", gap: 14,
     background: "var(--card)", border: "1px solid var(--line)",
-    borderRadius: 20, padding: 14, marginBottom: 10,
-    boxShadow: "0 4px 0 var(--line)",
+    borderRadius: 22, padding: 15, marginBottom: 10,
+    boxShadow: "0 2px 0 var(--line), 0 6px 20px rgba(0,0,0,.04)",
   },
   shortcutBrightIcon: {
-    width: 46, height: 46, borderRadius: 14, display: "flex",
+    width: 48, height: 48, borderRadius: 16, display: "flex",
     alignItems: "center", justifyContent: "center", flexShrink: 0,
-    boxShadow: "0 3px 0 rgba(0,0,0,.08)",
+    boxShadow: "0 4px 12px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.25)",
   },
 
   toast: {
     position: "fixed", bottom: 92, left: "50%", transform: "translateX(-50%)",
     background: "var(--ink)", color: "#fff", padding: "11px 18px", borderRadius: 14,
-    fontFamily: "'Fredoka', sans-serif", fontSize: 14, fontWeight: 600,
+    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 600,
     boxShadow: "0 8px 24px rgba(0,0,0,.25)", zIndex: 50, whiteSpace: "nowrap",
     maxWidth: "90%",
   },
   nav: {
     position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-    width: "100%", maxWidth: 460, background: "var(--card)",
+    width: "100%", maxWidth: 480, background: "rgba(255,255,255,.92)",
+    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
     borderTop: "1px solid var(--line)", display: "flex",
-    padding: "8px 6px 10px", justifyContent: "space-around", zIndex: 40,
+    padding: "10px 6px calc(12px + env(safe-area-inset-bottom))",
+    justifyContent: "space-around", zIndex: 40,
   },
   navBtn: {
     background: "none", border: "none", display: "flex", flexDirection: "column",
@@ -556,7 +566,10 @@ export const S = {
 
 export const TIERS = ["Small", "Medium", "Large"]
 export const TIER_COLORS = { Small: "var(--mint)", Medium: "var(--gold)", Large: "var(--coral)" }
-export const EMOJI_CHOICES = ["🍦","🎬","💳","🎡","🛍️","⭐","🎮","📚","🎨","🍕","🧸","🎧","💅","🛹","🎁","✨"]
+export const EMOJI_CHOICES = [
+  "💄","💅","🌸","💎","👛","🎀","💍","👜","🕶️","💖","🎧","🎮",
+  "📚","🎨","🍕","🍦","🎬","💳","🎡","🛍️","⭐","🧸","🛹","🎁","✨"
+]
 export const VIDEO_PROMPTS = [
   "Heyyy — tell us about a good choice you made today and why.",
   "What's your game plan for something tricky coming up?",

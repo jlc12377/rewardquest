@@ -1,3 +1,8 @@
-html, body { margin: 0; padding: 0; background: #FFF1E0; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #F4EFE9;
+  overscroll-behavior-y: none;
+}
 body { -webkit-font-smoothing: antialiased; }
-#root { min-height: 100vh; }
+#root { min-height: 100vh; min-height: -webkit-fill-available; }
