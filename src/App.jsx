@@ -119,11 +119,12 @@ function AuthScreen() {
       <style>{CSS}</style>
       <div style={S.authWrap} className="rq-fade">
         <div style={S.authBrand}>
-          <span style={S.brandName}>rewardquest</span>
-          <span style={S.brandDot} className="rq-dot" />
+          <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
         </div>
         <h1 style={S.authH1}>
-          {mode === 'signup' ? 'let\u2019s go.' : 'welcome back.'}
+          {mode === 'signup'
+            ? <>Welcome <span style={S.authH1Italic}>in.</span></>
+            : <>Welcome <span style={S.authH1Italic}>back.</span></>}
         </h1>
         <p style={S.authSub}>
           {mode === 'signup'
@@ -131,28 +132,27 @@ function AuthScreen() {
             : 'Sign in to your family.'}
         </p>
 
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
           <input style={S.authInput} type="email" autoComplete="email"
             placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input style={S.authInput} type="password"
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            placeholder="Password (6+ characters)" value={password}
+            placeholder="Password" value={password}
             onChange={(e) => setPassword(e.target.value)} />
-          {err && <div style={S.authErr}>{err}</div>}
-          <button type="submit" style={S.primaryBtn} className="rq-press" disabled={busy}>
+          {err && <div style={{ ...S.authErr, marginTop: 16 }}>{err}</div>}
+          <button type="submit" style={{ ...S.primaryBtn, marginTop: 28 }} className="rq-press" disabled={busy}>
             {busy ? '…' : (mode === 'signup' ? 'Create account' : 'Sign in')}
           </button>
         </form>
 
         <button type="button" style={S.authToggle}
           onClick={() => { setErr(null); setMode(mode === 'signup' ? 'signin' : 'signup') }}>
-          {mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create an account'}
+          {mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create one'}
         </button>
 
         {mode === 'signup' && (
           <div style={S.authInfo}>
-            Tip: parent creates their account first, then has the kid sign up with their own email.
-            Both accounts will share the same family data.
+            The first account in a family becomes the parent. Add the kid&rsquo;s account next on her phone. Both share the same family data.
           </div>
         )}
       </div>
@@ -196,7 +196,7 @@ function AppHeader({ family, role, onSignOut }) {
       <div>
         <div style={S.brand}>
           <Sparkles size={20} style={{ color: 'var(--gold)' }} />
-          <span style={S.brandName}>RewardQuest</span>
+          <span style={S.brandWord}>RewardQuest</span>
         </div>
         <div style={S.whoami}>
           <Heart size={12} style={{ color: 'var(--gum)' }} />
@@ -375,30 +375,22 @@ function KidApp({ familyId, user }) {
   )
 }
 
-/* kid header with avatar + animated point total */
+/* kid header — wordmark, soft subtitle, points number */
 function KidHeader({ family, pointsBump }) {
-  const avatar = family.avatar_emoji || "✨"
   const streak = family.streak || 1
   return (
     <header style={S.header}>
-      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-        <div style={S.avatarChip}>{avatar}</div>
-        <div>
-          <div style={S.brand}>
-            <span style={S.brandName}>rewardquest</span>
-            <span style={S.brandDot} className="rq-dot" />
-          </div>
-          <div style={S.whoami}>
-            <span style={S.miniStreakChip}>🔥 {streak}d</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>let's go</span>
-          </div>
+      <div>
+        <div style={S.brand}>
+          <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
+        </div>
+        <div style={S.whoami}>
+          <span style={S.miniStreakChip}>{streak}-day streak</span>
         </div>
       </div>
       <div style={S.pointsBadge}>
-        <Star size={14} style={{ color: '#fff' }} />
         <span style={S.pointsNum} className={pointsBump ? 'rq-bump' : ''}>{family.points || 0}</span>
-        <span style={S.pointsLabel}>PTS</span>
+        <span style={S.pointsLabel}>pts</span>
       </div>
     </header>
   )
@@ -409,102 +401,123 @@ function KidHome({ family, rewards, pending, counts, setTab }) {
   const next = sorted.find((r) => r.cost > (family.points || 0)) || sorted[sorted.length - 1]
   const pct = next ? Math.min(100, Math.round((family.points / next.cost) * 100)) : 0
   const tLine = todayLine(family, counts.today)
-  const onARoll = counts.today >= 3 || (family.streak || 1) >= 3
 
-  /* ticker tape content — repeats twice for seamless loop */
-  const tickerItems = [
-    { emoji: '✦', text: `${family.lifetime_points || 0} lifetime pts` },
-    { emoji: '✦', text: `${family.streak || 1}-day streak` },
-    { emoji: '✦', text: `${pending.length} pending` },
-    { emoji: '✦', text: `${counts.videos || 0} reflections` },
-    { emoji: '✦', text: `${counts.today || 0} today` },
-  ]
+  const firstName = (family.name || '').split(' ')[0] || ''
 
   return (
     <div className="rq-fade">
-      {/* MEGA points hero — the centerpiece */}
-      <div style={S.megaPoints}>
-        <div style={S.megaPointsLabel}>your balance</div>
-        <div style={S.megaPointsNum} className="rq-glow">
-          {family.points || 0}
+      {/* editorial intro */}
+      <div style={S.introBlock}>
+        <div style={S.introKicker}>your balance</div>
+        <div style={S.megaPointsWrap}>
+          <span style={S.megaPointsNum}>{family.points || 0}</span>
+          <span style={S.megaPointsTrail}>pts</span>
         </div>
-        <div style={S.megaPointsSub}>
-          {onARoll
-            ? <span style={S.streakChip}>🔥 you're on a roll · {counts.today >= 3 ? `${counts.today} today` : `${family.streak} days`}</span>
-            : tLine}
+        <div style={S.megaPointsLine}>
+          {tLine.split('.').map((part, i, arr) => part.trim() ? (
+            <span key={i}>
+              {i === 0 ? <span style={S.megaPointsLineAccent}>{part.trim()}.</span> : ` ${part.trim()}${i < arr.length - 1 ? '.' : ''}`}
+            </span>
+          ) : null)}
         </div>
       </div>
 
-      {/* ticker tape — running marquee */}
+      {/* quiet ticker tape */}
       <div style={S.tickerWrap}>
-        <div className="rq-ticker">
-          {[...tickerItems, ...tickerItems].map((t, i) => (
+        <div className="rq-marquee">
+          {[
+            `${family.lifetime_points || 0} lifetime`,
+            `${family.streak || 1}-day streak`,
+            `${counts.videos || 0} reflections`,
+            `${counts.today || 0} today`,
+            `${pending.length} pending`,
+          ].concat([
+            `${family.lifetime_points || 0} lifetime`,
+            `${family.streak || 1}-day streak`,
+            `${counts.videos || 0} reflections`,
+            `${counts.today || 0} today`,
+            `${pending.length} pending`,
+          ]).map((t, i) => (
             <span key={i} style={S.tickerItem}>
               <span style={S.tickerDot} />
-              {t.text}
+              {t}
             </span>
           ))}
         </div>
       </div>
 
-      {/* asymmetric next-reward sticker card */}
+      {/* next reward — full-bleed feature, the editorial moment */}
       {next && (
-        <div style={S.nextRewardCard} className="rq-grain">
-          <span style={S.nextRewardSticker}>next up</span>
-          <span style={S.nextRewardEmoji}>{next.emoji}</span>
-          <div style={S.nextRewardLabel}>{next.label}</div>
-          <div style={S.nextProgressTrack}>
-            <div style={{ ...S.nextProgressFill, width: `${pct}%` }} />
+        <div style={S.feature}>
+          <div style={S.featureKicker}>Next reward</div>
+          <span style={S.featureEmoji}>{next.emoji}</span>
+          <div style={S.featureLabel}>{next.label}</div>
+          <div style={S.featureProgressTrack}>
+            <div style={{ ...S.featureProgressFill, width: `${pct}%` }} />
           </div>
-          <div style={S.nextProgressFoot}>
+          <div style={S.featureProgressFoot}>
             <span>{family.points || 0} / {next.cost}</span>
-            <span style={{ opacity: 0.8 }}>{pct}%</span>
+            <span>{pct}%</span>
           </div>
         </div>
       )}
 
+      {/* stats — hairline divided */}
       <div style={S.statRow}>
-        <Stat n={pending.length} label="Pending" />
-        <Stat n={family.lifetime_points || 0} label="Lifetime" />
-        <Stat n={family.streak || 1} label="Streak" />
+        <div style={S.statCell}>
+          <div style={S.statNum}>{pending.length}</div>
+          <div style={S.statLabel}>Pending</div>
+        </div>
+        <div style={{ ...S.statCell, ...S.statCellMid }}>
+          <div style={S.statNum}>{family.lifetime_points || 0}</div>
+          <div style={S.statLabel}>Lifetime</div>
+        </div>
+        <div style={S.statCellLast}>
+          <div style={S.statNum}>{family.streak || 1}</div>
+          <div style={S.statLabel}>Streak</div>
+        </div>
       </div>
 
-      <h3 style={S.h3}>What's next</h3>
+      <div style={S.eyebrow}>
+        <span style={S.eyebrowNum}>01</span>
+        <span>What's next</span>
+      </div>
+
       <button onClick={() => setTab('tasks')} style={S.shortcutBright} className="rq-press">
-        <div style={{ ...S.shortcutBrightIcon, background: 'linear-gradient(135deg, #C8FF3D, #9DD12E)' }}>
-          <CheckCircle2 size={22} style={{ color: '#0E0716' }} />
+        <div style={{ ...S.shortcutBrightIcon, background: 'var(--shelf)' }}>
+          <CheckCircle2 size={20} style={{ color: 'var(--ink)' }} />
         </div>
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={S.shortcutTitle}>Drop a quest</div>
-          <div style={S.shortcutSub}>snap proof · stack points</div>
+          <div style={S.shortcutTitle}>Log a quest</div>
+          <div style={S.shortcutSub}>Snap proof · earn points</div>
         </div>
-        <ChevronRight size={18} style={{ color: 'var(--mute)' }} />
+        <ChevronRight size={16} style={{ color: 'var(--mute2)' }} />
       </button>
       <button onClick={() => setTab('video')} style={S.shortcutBright} className="rq-press">
-        <div style={{ ...S.shortcutBrightIcon, background: 'linear-gradient(135deg, #FF52A8, #8C5AFF)' }}>
-          <Camera size={22} style={{ color: '#fff' }} />
+        <div style={{ ...S.shortcutBrightIcon, background: 'var(--accentSoft)' }}>
+          <Camera size={20} style={{ color: 'var(--accent)' }} />
         </div>
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={S.shortcutTitle}>Record a vibe</div>
-          <div style={S.shortcutSub}>quick reflection · +{VIDEO_PTS} pts</div>
+          <div style={S.shortcutTitle}>Record a reflection</div>
+          <div style={S.shortcutSub}>Worth {VIDEO_PTS} pts · 90 seconds</div>
         </div>
-        <ChevronRight size={18} style={{ color: 'var(--mute)' }} />
+        <ChevronRight size={16} style={{ color: 'var(--mute2)' }} />
       </button>
       <button onClick={() => setTab('store')} style={S.shortcutBright} className="rq-press">
-        <div style={{ ...S.shortcutBrightIcon, background: 'linear-gradient(135deg, #FFCD3D, #FF8A3D)' }}>
-          <Gift size={22} style={{ color: '#0E0716' }} />
+        <div style={{ ...S.shortcutBrightIcon, background: 'var(--shelf)' }}>
+          <Gift size={20} style={{ color: 'var(--ink)' }} />
         </div>
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={S.shortcutTitle}>Cash in</div>
-          <div style={S.shortcutSub}>spend or save · your call</div>
+          <div style={S.shortcutTitle}>The reward shelf</div>
+          <div style={S.shortcutSub}>Redeem or save</div>
         </div>
-        <ChevronRight size={18} style={{ color: 'var(--mute)' }} />
+        <ChevronRight size={16} style={{ color: 'var(--mute2)' }} />
       </button>
 
       {pending.length > 0 && (
         <div style={S.pendingNote}>
           <Clock size={14} />
-          {pending.length} thing{pending.length !== 1 ? 's' : ''} pending parent approval
+          {pending.length} {pending.length !== 1 ? 'items' : 'item'} pending approval
         </div>
       )}
     </div>
@@ -872,17 +885,15 @@ function ParentHeader({ family, pointsBump }) {
     <header style={S.header}>
       <div>
         <div style={S.brand}>
-          <span style={S.brandName}>rewardquest</span>
-          <span style={S.brandDot} className="rq-dot" />
+          <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
         </div>
         <div style={S.whoami}>
-          <span style={{ opacity: 0.7 }}>parent view</span>
+          <span>Parent</span>
         </div>
       </div>
       <div style={S.pointsBadge}>
-        <Star size={14} style={{ color: 'var(--ink)' }} />
         <span style={S.pointsNum} className={pointsBump ? 'rq-bump' : ''}>{family.points || 0}</span>
-        <span style={S.pointsLabel}>PTS</span>
+        <span style={S.pointsLabel}>pts</span>
       </div>
     </header>
   )
@@ -914,20 +925,17 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
       </div>
 
       <div style={S.weekBand}>
-        <div style={S.weekCard}>
-          <div style={S.weekCardEmoji}>⚡</div>
-          <div style={S.weekCardNum}>{counts.weekPts}</div>
-          <div style={S.weekCardLabel}>Pts this week</div>
+        <div style={S.weekCell}>
+          <div style={S.weekCellNum}>{counts.weekPts}</div>
+          <div style={S.weekCellLabel}>Pts / week</div>
         </div>
-        <div style={S.weekCard}>
-          <div style={S.weekCardEmoji}>✅</div>
-          <div style={S.weekCardNum}>{counts.weekClaims}</div>
-          <div style={S.weekCardLabel}>Approved</div>
+        <div style={S.weekCell}>
+          <div style={S.weekCellNum}>{counts.weekClaims}</div>
+          <div style={S.weekCellLabel}>Approved</div>
         </div>
-        <div style={S.weekCard}>
-          <div style={S.weekCardEmoji}>🎥</div>
-          <div style={S.weekCardNum}>{counts.weekVideos}</div>
-          <div style={S.weekCardLabel}>Videos</div>
+        <div style={{ ...S.weekCell, ...S.weekCellLast }}>
+          <div style={S.weekCellNum}>{counts.weekVideos}</div>
+          <div style={S.weekCellLabel}>Videos</div>
         </div>
       </div>
 

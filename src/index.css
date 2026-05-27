@@ -1,6 +1,6 @@
 html, body {
   margin: 0; padding: 0;
-  background: #F8F6EF;
+  background: #FAFAF7;
   color: #0A0A0A;
   overscroll-behavior-y: none;
 }
@@ -10,4 +10,4 @@ body {
 }
 #root { min-height: 100vh; min-height: -webkit-fill-available; }
 * { -webkit-tap-highlight-color: transparent; }
-::selection { background: #C8FF3D; color: #0A0A0A; }
+::selection { background: #E91E63; color: #fff; }
