@@ -1,571 +1,859 @@
+/* ============================================================
+   RewardQuest visual system — "slime"
+   Off-white base, electric slime green + hot pink accents,
+   drips, glossy wet shine, squishy interactions.
+   ============================================================ */
+
 export const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 body, button, input, select, textarea {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  letter-spacing: -0.005em;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  letter-spacing: -0.01em;
 }
-.rq-fade { animation: rqFade .35s ease both; }
-@keyframes rqFade { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:none;} }
-.rq-press { transition: transform .12s ease; cursor: pointer; }
-.rq-press:active { transform: scale(.96); }
-.rq-toast { animation: rqToast .3s ease both; }
-@keyframes rqToast { from { opacity:0; transform: translate(-50%, 12px);} to {opacity:1; transform: translate(-50%,0);} }
 ::-webkit-scrollbar { width: 0; }
 
-/* confetti */
+.rq-fade { animation: rqFade .45s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes rqFade { from { opacity:0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+
+/* squishy press — like pressing into slime */
+.rq-squish { transition: transform .18s cubic-bezier(.3,1.6,.4,1), filter .15s ease; cursor: pointer; }
+.rq-squish:active { transform: scale(.94, .96) rotate(-.5deg); filter: brightness(1.05); }
+
+/* press (legacy alias) */
+.rq-press { transition: transform .15s cubic-bezier(.3,1.5,.6,1); cursor: pointer; }
+.rq-press:active { transform: scale(.96); }
+
+.rq-toast { animation: rqToast .35s ease both; }
+@keyframes rqToast { from { opacity:0; transform: translate(-50%, 14px);} to {opacity:1; transform: translate(-50%,0);} }
+
+/* gentle bob — for drips and stickers */
+.rq-bob { animation: rqBob 4s ease-in-out infinite; }
+@keyframes rqBob {
+  0%,100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+  50%     { transform: translateY(-4px) rotate(calc(var(--r, 0deg) + 3deg)); }
+}
+.rq-bob-slow { animation: rqBob 6s ease-in-out infinite; }
+
+/* points number bump */
+.rq-bump { animation: rqBump .9s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes rqBump {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+/* slime drip — animated dripping motion */
+.rq-drip {
+  animation: rqDrip 3.5s ease-in-out infinite;
+  transform-origin: top center;
+}
+@keyframes rqDrip {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(1.08); }
+}
+
+/* sparkle pop on point gain */
+.rq-sparkle {
+  position: fixed; pointer-events: none; z-index: 200;
+  font-size: 20px;
+  animation: rqSparkle 1.4s cubic-bezier(.2,.6,.4,1) forwards;
+}
+@keyframes rqSparkle {
+  0%   { transform: translate(-50%,-50%) rotate(0) scale(.3); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)) scale(1.1); opacity: 0; }
+}
+
+/* confetti (still used for big moments) */
 .rq-confetti-piece {
-  position: fixed; top: 35%; left: 50%; width: 9px; height: 14px;
-  border-radius: 2px; pointer-events: none; z-index: 200;
-  animation: rqConfetti 1.4s cubic-bezier(.2,.6,.4,1) forwards;
+  position: fixed; top: 35%; left: 50%; width: 11px; height: 18px;
+  border-radius: 3px; pointer-events: none; z-index: 200;
+  animation: rqConfetti 1.6s cubic-bezier(.2,.6,.4,1) forwards;
 }
 @keyframes rqConfetti {
   0%   { transform: translate(-50%,-50%) rotate(0) scale(.5); opacity: 1; }
   100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)) scale(1); opacity: 0; }
 }
-/* points number bump */
-.rq-bump { animation: rqBump .6s ease both; }
-@keyframes rqBump {
-  0% { transform: scale(1); }
-  35% { transform: scale(1.35); color: var(--mint); }
-  100% { transform: scale(1); }
-}
+
 /* badge unlock card */
 .rq-badge-pop {
-  position: fixed; top: 30%; left: 50%; transform: translateX(-50%);
-  background: linear-gradient(135deg, var(--gold), #FFA800);
-  color: var(--ink); padding: 20px 26px; border-radius: 22px;
-  font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; text-align: center;
-  box-shadow: 0 16px 38px rgba(0,0,0,.28); z-index: 180;
-  animation: rqBadgePop .55s cubic-bezier(.2,1.3,.6,1) both, rqBadgeOut .4s ease 2.3s both;
-  max-width: 84%;
+  position: fixed; top: 28%; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, #C8FF3D 0%, #9DD12E 100%);
+  color: #0A0A0A; padding: 22px 28px; border-radius: 28px;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-align: center;
+  box-shadow: 0 20px 60px rgba(157,209,46,.5), 0 0 0 3px #0A0A0A;
+  z-index: 180; max-width: 84%;
+  animation: rqBadgePop .6s cubic-bezier(.2,1.4,.5,1) both, rqBadgeOut .4s ease 2.5s both;
 }
 @keyframes rqBadgePop {
-  0% { opacity: 0; transform: translateX(-50%) scale(.5) rotate(-8deg); }
-  100% { opacity: 1; transform: translateX(-50%) scale(1) rotate(0); }
+  0% { opacity: 0; transform: translateX(-50%) scale(.4) rotate(-12deg); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1) rotate(-2deg); }
 }
 @keyframes rqBadgeOut {
-  to { opacity: 0; transform: translateX(-50%) translateY(-30px) scale(.95); }
+  to { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(.9); }
 }
-.rq-spark { animation: rqSpark 2s linear infinite; }
-@keyframes rqSpark { 50% { transform: rotate(180deg) scale(1.1); } }
+
+/* ticker tape — running marquee */
+.rq-ticker {
+  display: flex; gap: 32px; white-space: nowrap;
+  animation: rqTicker 28s linear infinite;
+}
+@keyframes rqTicker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* wordmark dot pulse */
+.rq-dot { animation: rqDot 1.8s ease-in-out infinite; }
+@keyframes rqDot {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.4); }
+}
 `
 
+/* ============================================================
+   STYLES
+   ============================================================ */
 export const S = {
   app: {
-    "--bg": "#F4EFE9", "--card": "#FFFFFF", "--ink": "#1A1426",
-    "--mute": "#7E7488", "--line": "#E5DDD3", "--mint": "#3FCFA0",
-    "--gold": "#FF9F1C", "--coral": "#FF5C4D", "--lav": "#9D6FE8",
-    "--peach": "#FF9466", "--berry": "#E04891", "--sky": "#3FA3F0",
-    "--soft": "#FAF6F0",
+    /* slime palette */
+    "--bg":        "#F8F6EF",  /* warm off-white, slight cream */
+    "--surface":   "#FFFFFF",
+    "--ink":       "#0A0A0A",  /* near-black, more confident than #000 */
+    "--inkSoft":   "#1A1A1A",
+    "--mute":      "#6B6B6B",
+    "--mute2":     "#A3A3A3",
+    "--line":      "#0A0A0A",  /* yes — borders are solid black, very editorial */
+    "--lineSoft":  "#E5E2D8",
+
+    /* slime accents */
+    "--slime":     "#C8FF3D",  /* THE color */
+    "--slimeDeep": "#9DD12E",
+    "--slimeGlow": "#E1FF7A",
+    "--gum":       "#FF52A8",  /* hot pink */
+    "--gumDeep":   "#D63D8E",
+    "--ink2":      "#0A0A0A",
+    "--sun":       "#FFCD3D",
+    "--cyan":      "#3DD9FF",
+
     maxWidth: 480, margin: "0 auto", minHeight: "100vh",
-    background: "var(--bg)", color: "var(--ink)",
-    fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    background: "var(--bg)",
+    color: "var(--ink)",
+    fontFamily: "'Inter', sans-serif",
     display: "flex", flexDirection: "column",
     position: "relative",
-    paddingBottom: "calc(78px + env(safe-area-inset-bottom))",
+    paddingBottom: "calc(82px + env(safe-area-inset-bottom))",
     paddingTop: "env(safe-area-inset-top)",
+    overflowX: "hidden",
   },
+
   loading: {
     minHeight: "60vh", display: "flex", flexDirection: "column",
     alignItems: "center", justifyContent: "center",
-    fontFamily: "'Nunito', sans-serif", color: "#9C8FA8",
+    color: "#6B6B6B", fontWeight: 500,
   },
+
+  /* ===== header ===== */
   header: {
-    display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-    padding: "20px 20px 14px",
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "20px 22px 8px",
   },
-  brand: { display: "flex", alignItems: "center", gap: 7 },
-  brandName: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em" },
-  whoami: { fontSize: 12, color: "var(--mute)", display: "flex", alignItems: "center", gap: 5, marginTop: 4, fontWeight: 600 },
+  brand: { display: "flex", alignItems: "baseline", gap: 3 },
+  brandName: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+    fontSize: 24, letterSpacing: "-0.045em", color: "var(--ink)",
+  },
+  brandDot: {
+    display: "inline-block", width: 10, height: 10, borderRadius: "50%",
+    background: "var(--slime)", marginLeft: 3,
+    border: "1.5px solid var(--ink)",
+  },
+  whoami: {
+    fontSize: 12, color: "var(--mute)", display: "flex", alignItems: "center",
+    gap: 6, marginTop: 4, fontWeight: 600, letterSpacing: 0.1,
+  },
+
+  /* points pill — small in the header */
   pointsBadge: {
-    display: "flex", alignItems: "center", gap: 4,
-    background: "linear-gradient(135deg, var(--gold) 0%, var(--coral) 100%)",
-    color: "#fff",
-    padding: "10px 15px", borderRadius: 18,
-    boxShadow: "0 5px 0 rgba(255,107,71,.4)",
+    display: "flex", alignItems: "center", gap: 5,
+    background: "var(--slime)",
+    color: "var(--ink)",
+    padding: "8px 14px", borderRadius: 999,
+    border: "1.5px solid var(--ink)",
+    boxShadow: "3px 3px 0 var(--ink)",
   },
-  pointsNum: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 700, fontSize: 20, color: "#fff" },
-  pointsLabel: { fontSize: 12, fontWeight: 800, color: "#fff", opacity: 0.9 },
-  main: { flex: 1, padding: "4px 20px 20px" },
-  h2: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 800, margin: "8px 0 16px", letterSpacing: "-0.025em" },
-  h3: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, fontWeight: 800, margin: "24px 0 10px", color: "var(--ink)", letterSpacing: "-0.01em", textTransform: "uppercase", opacity: 0.55 },
-
-  heroCard: {
-    background: "linear-gradient(135deg, #FF5C4D 0%, #E04891 50%, #9D6FE8 100%)",
-    borderRadius: 26, padding: 24, color: "#fff",
-    boxShadow: "0 14px 36px rgba(224,72,145,.35), inset 0 1px 0 rgba(255,255,255,.2)",
-    position: "relative", overflow: "hidden",
+  pointsNum: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+    fontSize: 16, color: "var(--ink)", letterSpacing: "-0.02em",
   },
-  heroTop: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  heroLabel: { fontSize: 12, fontWeight: 700, opacity: 0.85, letterSpacing: 0.5, textTransform: "uppercase" },
-  heroEmoji: { fontSize: 26 },
-  heroReward: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 21, margin: "6px 0 14px" },
-  progressTrack: { background: "rgba(255,255,255,.32)", height: 12, borderRadius: 8, overflow: "hidden" },
-  progressFill: { height: "100%", background: "var(--gold)", borderRadius: 8, transition: "width .5s ease" },
-  heroFoot: { fontSize: 13, fontWeight: 700, marginTop: 9, opacity: 0.95 },
+  pointsLabel: { fontSize: 10, fontWeight: 700, color: "var(--ink)", letterSpacing: 0.6 },
 
-  statRow: { display: "flex", gap: 10, marginTop: 14 },
+  main: { flex: 1, padding: "8px 22px 24px" },
+
+  /* ===== typography ===== */
+  h2: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 34,
+    color: "var(--ink)", margin: "10px 0 18px", letterSpacing: "-0.04em", lineHeight: 1,
+  },
+  h3: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, fontWeight: 600,
+    margin: "32px 0 12px", color: "var(--mute)",
+    textTransform: "uppercase", letterSpacing: 2,
+  },
+
+  /* ===== KID HOME: MEGA points hero ===== */
+  megaPoints: {
+    position: "relative", padding: "16px 0 8px", textAlign: "center",
+    marginBottom: 4,
+  },
+  megaPointsLabel: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+    fontSize: 11, letterSpacing: 4, textTransform: "uppercase",
+    color: "var(--mute)",
+  },
+  megaPointsNum: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+    fontSize: 108, lineHeight: 0.95, letterSpacing: "-0.07em",
+    color: "var(--ink)",
+    margin: "8px 0 2px", display: "inline-block",
+    position: "relative",
+  },
+  /* the slime drip under the number */
+  megaPointsDrip: {
+    width: 100, height: 28, margin: "-6px auto 0", display: "block",
+  },
+  megaPointsSub: {
+    fontSize: 14, color: "var(--ink)", fontWeight: 600,
+    marginTop: 14, letterSpacing: -0.005,
+  },
+
+  /* "on a roll" streak chip */
+  streakChip: {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    background: "var(--gum)",
+    color: "#fff", padding: "8px 16px", borderRadius: 999,
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, fontWeight: 600,
+    border: "1.5px solid var(--ink)",
+    boxShadow: "3px 3px 0 var(--ink)",
+    letterSpacing: "-0.005em",
+  },
+
+  /* ticker tape */
+  tickerWrap: {
+    margin: "18px -22px 24px", padding: "9px 0",
+    background: "var(--ink)",
+    overflow: "hidden",
+    borderTop: "1.5px solid var(--ink)",
+    borderBottom: "1.5px solid var(--ink)",
+  },
+  tickerItem: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 12,
+    fontWeight: 600, color: "var(--slime)", letterSpacing: 1.8,
+    textTransform: "uppercase", display: "flex", alignItems: "center", gap: 10,
+  },
+  tickerStar: {
+    color: "var(--slime)", fontSize: 14,
+  },
+
+  /* ===== next-reward sticker card ===== */
+  nextRewardCard: {
+    position: "relative", marginTop: 22, padding: 22,
+    background: "var(--slime)",
+    borderRadius: 28, overflow: "visible",
+    border: "1.5px solid var(--ink)",
+    boxShadow: "5px 5px 0 var(--ink)",
+    transform: "rotate(-1deg)",
+  },
+  nextRewardSticker: {
+    position: "absolute", top: -16, right: 14,
+    background: "var(--gum)", color: "#fff",
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, fontWeight: 700,
+    padding: "7px 14px", borderRadius: 999, letterSpacing: 1.4,
+    transform: "rotate(8deg)",
+    border: "1.5px solid var(--ink)",
+    boxShadow: "2px 2px 0 var(--ink)",
+    textTransform: "uppercase",
+  },
+  nextRewardEmoji: { fontSize: 56, marginBottom: 4, display: "block", lineHeight: 1 },
+  nextRewardLabel: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+    fontSize: 24, color: "var(--ink)", letterSpacing: "-0.03em",
+    marginBottom: 14, lineHeight: 1.1,
+  },
+  nextProgressTrack: {
+    height: 14, borderRadius: 999, background: "#fff",
+    border: "1.5px solid var(--ink)", overflow: "hidden",
+  },
+  nextProgressFill: {
+    height: "100%", borderRadius: 999,
+    background: "var(--gum)",
+    transition: "width .6s cubic-bezier(.2,.8,.3,1)",
+  },
+  nextProgressFoot: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    marginTop: 10, color: "var(--ink)", fontSize: 13,
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, letterSpacing: -0.005,
+  },
+
+  /* ===== stat row ===== */
+  statRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 22 },
   statCard: {
-    flex: 1, background: "var(--card)", borderRadius: 16, padding: "13px 6px",
-    textAlign: "center", border: "1px solid var(--line)",
+    background: "var(--surface)", borderRadius: 18, padding: "14px 8px",
+    border: "1.5px solid var(--ink)", textAlign: "center",
+    boxShadow: "3px 3px 0 var(--ink)",
   },
-  statNum: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 21, color: "var(--ink)" },
-  statLabel: { fontSize: 10, color: "var(--mute)", fontWeight: 700, marginTop: 2 },
+  statNum: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700,
+    fontSize: 22, color: "var(--ink)", letterSpacing: "-0.025em",
+  },
+  statLabel: {
+    fontSize: 10, color: "var(--mute)", fontWeight: 600, marginTop: 3,
+    letterSpacing: 1.2, textTransform: "uppercase",
+  },
+
+  /* ===== shortcut tiles ===== */
+  shortcutBright: {
+    width: "100%", position: "relative", display: "flex", alignItems: "center", gap: 14,
+    background: "var(--surface)", border: "1.5px solid var(--ink)",
+    borderRadius: 22, padding: "16px 18px", marginBottom: 12,
+    overflow: "hidden",
+    boxShadow: "4px 4px 0 var(--ink)",
+  },
+  shortcutBrightIcon: {
+    width: 52, height: 52, borderRadius: 16, display: "flex",
+    alignItems: "center", justifyContent: "center", flexShrink: 0,
+    border: "1.5px solid var(--ink)",
+  },
+  shortcutTitle: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 18, fontWeight: 700,
+    color: "var(--ink)", letterSpacing: "-0.025em",
+  },
+  shortcutSub: { fontSize: 12.5, color: "var(--mute)", fontWeight: 500, marginTop: 2 },
 
   shortcut: {
     width: "100%", display: "flex", alignItems: "center", gap: 13,
-    background: "var(--card)", border: "1px solid var(--line)",
+    background: "var(--surface)", border: "1.5px solid var(--ink)",
     borderRadius: 18, padding: 13, marginBottom: 10,
+    boxShadow: "3px 3px 0 var(--ink)",
   },
   shortcutIcon: {
     width: 42, height: 42, borderRadius: 13, display: "flex",
     alignItems: "center", justifyContent: "center", flexShrink: 0,
+    border: "1.5px solid var(--ink)",
   },
-  shortcutTitle: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15.5 },
-  shortcutSub: { fontSize: 12, color: "var(--mute)", fontWeight: 600 },
 
+  /* pending chip + proof banner */
   pendingNote: {
-    marginTop: 16, background: "#FFF1DC", border: "1px dashed var(--gold)",
-    borderRadius: 14, padding: "11px 13px", fontSize: 13, fontWeight: 600,
-    display: "flex", alignItems: "center", gap: 8, color: "#8A6B2E",
+    marginTop: 18,
+    background: "var(--sun)", border: "1.5px solid var(--ink)",
+    borderRadius: 14, padding: "11px 14px",
+    fontSize: 13, fontWeight: 600, color: "var(--ink)",
+    display: "flex", alignItems: "center", gap: 8,
+    boxShadow: "3px 3px 0 var(--ink)",
   },
   proofBanner: {
-    background: "var(--ink)", color: "#fff", borderRadius: 13,
-    padding: "10px 13px", fontSize: 12.5, fontWeight: 700,
-    display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
+    background: "var(--ink)", color: "var(--slime)", borderRadius: 14,
+    padding: "11px 14px", fontSize: 13, fontWeight: 500,
+    display: "flex", alignItems: "center", gap: 8, marginBottom: 18,
   },
 
+  /* section tag */
   sectionTag: {
     display: "flex", alignItems: "center", gap: 7,
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14.5, marginBottom: 3,
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: 700,
+    marginBottom: 4, color: "var(--ink)", letterSpacing: "-0.015em",
   },
-  sectionHint: { fontSize: 12.5, color: "var(--mute)", fontWeight: 600, margin: "0 0 12px" },
-  tierDot: { width: 11, height: 11, borderRadius: 4, display: "inline-block" },
+  sectionHint: { fontSize: 12.5, color: "var(--mute)", fontWeight: 500, margin: "0 0 14px" },
+  tierDot: { width: 11, height: 11, borderRadius: 4, display: "inline-block", border: "1.5px solid var(--ink)" },
 
+  /* task rows */
   taskRow: {
-    width: "100%", display: "flex", alignItems: "center", gap: 11,
-    background: "var(--card)", border: "1px solid var(--line)",
-    borderRadius: 15, padding: "11px 12px", marginBottom: 8,
+    width: "100%", display: "flex", alignItems: "center", gap: 12,
+    background: "var(--surface)", border: "1.5px solid var(--ink)",
+    borderRadius: 16, padding: "12px 14px", marginBottom: 9,
+    boxShadow: "3px 3px 0 var(--ink)",
   },
-  taskRowDone: { background: "#F1FBF6", borderColor: "#CBEEDF" },
-  taskRowPending: { background: "#FBF7F1", borderColor: "var(--gold)" },
-  taskLabel: { fontWeight: 700, fontSize: 14.5 },
+  taskRowDone: {
+    background: "var(--slime)",
+  },
+  taskRowPending: {
+    background: "var(--sun)",
+  },
+  taskLabel: { fontWeight: 600, fontSize: 14.5, color: "var(--ink)", letterSpacing: "-0.005em" },
   strike: { textDecoration: "line-through", color: "var(--mute)" },
   taskPts: {
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, color: "var(--ink)",
-    background: "#EAF5EE", padding: "5px 11px", borderRadius: 9, flexShrink: 0,
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, color: "var(--ink)",
+    background: "var(--slime)", padding: "6px 12px", borderRadius: 10,
+    flexShrink: 0, fontWeight: 700, letterSpacing: "-0.01em",
+    border: "1.5px solid var(--ink)",
   },
   proofBtn: {
-    display: "flex", alignItems: "center", gap: 5, background: "var(--mint)",
-    color: "var(--ink)", border: "none", borderRadius: 11, padding: "9px 12px",
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 13,
-    boxShadow: "0 3px 0 #59BD98", flexShrink: 0,
+    display: "flex", alignItems: "center", gap: 5,
+    background: "var(--slime)",
+    color: "var(--ink)", border: "1.5px solid var(--ink)", borderRadius: 12, padding: "10px 14px",
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13,
+    boxShadow: "3px 3px 0 var(--ink)", flexShrink: 0,
+    letterSpacing: "-0.01em",
   },
+
   decisionRow: {
-    width: "100%", display: "flex", alignItems: "center", gap: 11,
-    background: "var(--card)", border: "1.5px solid var(--gold)",
-    borderRadius: 15, padding: "12px", marginBottom: 8,
+    width: "100%", display: "flex", alignItems: "center", gap: 12,
+    background: "var(--surface)",
+    border: "1.5px solid var(--ink)",
+    borderRadius: 16, padding: "12px 14px", marginBottom: 9,
+    boxShadow: "3px 3px 0 var(--ink)",
   },
-  decisionPending: { borderColor: "var(--line)", background: "#FBF7F1" },
+  decisionPending: { background: "var(--sun)" },
   decisionMain: { flex: 1, textAlign: "left" },
-  decisionLabel: { fontWeight: 700, fontSize: 14.5 },
+  decisionLabel: { fontWeight: 600, fontSize: 14.5, color: "var(--ink)", letterSpacing: "-0.005em" },
   decisionPts: {
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15, color: "var(--ink)",
-    background: "var(--gold)", padding: "5px 12px", borderRadius: 10, flexShrink: 0,
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, color: "#fff",
+    background: "var(--gum)",
+    padding: "6px 13px", borderRadius: 11, flexShrink: 0, fontWeight: 700,
+    border: "1.5px solid var(--ink)",
   },
-  pendingTag: { fontSize: 11.5, color: "var(--mute)", fontWeight: 700, marginTop: 3, display: "block" },
+  pendingTag: { fontSize: 11.5, color: "var(--ink)", fontWeight: 600, marginTop: 3, display: "block" },
 
-  thumb: { borderRadius: 9, objectFit: "cover", flexShrink: 0, background: "#2B2238" },
+  /* media thumbnail */
+  thumb: { borderRadius: 11, objectFit: "cover", flexShrink: 0, background: "#000", border: "1.5px solid var(--ink)" },
   thumbEmpty: {
-    borderRadius: 9, background: "var(--line)", display: "flex",
+    borderRadius: 11, background: "var(--bg)",
+    border: "1.5px solid var(--ink)",
+    display: "flex",
     alignItems: "center", justifyContent: "center", color: "var(--mute)", flexShrink: 0,
-  },
-
-  promptCard: {
-    background: "var(--card)", border: "1px solid var(--line)",
-    borderRadius: 18, padding: 16, marginBottom: 14,
-  },
-  promptKicker: { fontSize: 11, fontWeight: 800, color: "var(--coral)", letterSpacing: 0.6, textTransform: "uppercase" },
-  promptText: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 17, margin: "7px 0 12px", lineHeight: 1.35 },
-  promptSwap: {
-    display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700,
-    background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 10,
-    padding: "6px 10px", color: "var(--mute)",
-  },
-  stage: {
-    position: "relative", background: "#2B2238", borderRadius: 18,
-    overflow: "hidden", aspectRatio: "3/4", display: "flex",
-    alignItems: "center", justifyContent: "center", marginBottom: 12,
-  },
-  videoEl: { width: "100%", height: "100%", objectFit: "cover" },
-  stagePlaceholder: {
-    position: "absolute", display: "flex", flexDirection: "column",
-    alignItems: "center", gap: 8, color: "#fff", fontSize: 13, fontWeight: 600,
-    textAlign: "center", padding: 20,
-  },
-  primaryBtn: {
-    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-    background: "var(--ink)", color: "#fff", border: "none", borderRadius: 15,
-    padding: "15px", fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 15.5, fontWeight: 600,
-    boxShadow: "0 5px 0 #271C36", width: "100%",
-  },
-  ghostBtn: {
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-    background: "var(--card)", color: "var(--ink)", border: "1.5px solid var(--line)",
-    borderRadius: 15, padding: "15px 18px", fontFamily: "'Plus Jakarta Sans', sans-serif",
-    fontSize: 14.5, fontWeight: 600,
-  },
-  videoNote: {
-    fontSize: 12, color: "var(--mute)", fontWeight: 600, marginTop: 12,
-    background: "#FFF1DC", borderRadius: 12, padding: "10px 12px", lineHeight: 1.45,
-  },
-  videoLogRow: {
-    display: "flex", alignItems: "center", gap: 11, background: "var(--card)",
-    border: "1px solid var(--line)", borderRadius: 14, padding: 10, marginBottom: 8,
-  },
-  videoLogPrompt: {
-    fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
-    overflow: "hidden", textOverflow: "ellipsis",
-  },
-  videoLogDate: { fontSize: 11, color: "var(--mute)", fontWeight: 600, marginTop: 2 },
-
-  rewardRow: {
-    display: "flex", alignItems: "center", gap: 12, background: "var(--card)",
-    border: "1px solid var(--line)", borderRadius: 15, padding: 13, marginBottom: 8,
-  },
-  rewardEmoji: { fontSize: 26 },
-  rewardLabel: { fontWeight: 800, fontSize: 14.5 },
-  rewardCost: { fontSize: 12.5, color: "var(--mute)", fontWeight: 700, marginTop: 1 },
-  redeemBtn: {
-    background: "var(--mint)", color: "var(--ink)", border: "none",
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 13.5,
-    padding: "10px 16px", borderRadius: 12, boxShadow: "0 4px 0 #59BD98",
-  },
-  redeemLocked: { background: "var(--line)", boxShadow: "0 4px 0 #D6C8BB", color: "var(--mute)" },
-  redeemedRow: {
-    display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, fontWeight: 700,
-    padding: "10px 12px", background: "var(--card)", border: "1px solid var(--line)",
-    borderRadius: 12, marginBottom: 7,
-  },
-  redeemedDate: { fontSize: 12, color: "var(--mute)", fontWeight: 700 },
-
-  parentHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
-  exitBtn: {
-    display: "flex", alignItems: "center", gap: 5, background: "var(--card)",
-    border: "1px solid var(--line)", borderRadius: 11, padding: "8px 12px",
-    fontWeight: 800, fontSize: 12.5, color: "var(--ink)",
-  },
-  modeRow: { display: "flex", gap: 6, marginBottom: 18, flexWrap: "wrap" },
-  modeBtn: {
-    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-    background: "var(--card)", border: "1.5px solid var(--line)", borderRadius: 12,
-    padding: "10px 8px", fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 12.5,
-    color: "var(--mute)", minWidth: 100,
-  },
-  modeActive: { background: "var(--ink)", color: "#fff", borderColor: "var(--ink)" },
-
-  approvalCard: {
-    display: "flex", alignItems: "center", gap: 11, background: "var(--card)",
-    border: "1.5px solid var(--gold)", borderRadius: 15, padding: 12, marginBottom: 9,
-  },
-  approveBtn: {
-    display: "flex", alignItems: "center", gap: 5, background: "var(--mint)",
-    color: "var(--ink)", border: "none", borderRadius: 11, padding: "11px 13px",
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 13,
-    boxShadow: "0 4px 0 #59BD98",
-  },
-  declineBtn: {
-    background: "#FFE6E0", color: "#B5503A", border: "none", borderRadius: 11,
-    padding: "11px 12px", display: "flex", alignItems: "center",
-  },
-  emptyBox: {
-    display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-    padding: "30px 20px", color: "var(--mute)", fontSize: 13.5, fontWeight: 700,
-    background: "var(--card)", border: "1px dashed var(--line)", borderRadius: 16,
-  },
-  signOutBtn: {
-    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-    width: "100%", marginTop: 24, background: "transparent", border: "1px solid var(--line)",
-    color: "var(--mute)", borderRadius: 12, padding: "11px", fontWeight: 700, fontSize: 12.5,
-  },
-
-  itemRow: {
-    display: "flex", alignItems: "center", gap: 8, background: "var(--card)",
-    border: "1px solid var(--line)", borderRadius: 12, padding: "9px 11px", marginBottom: 7,
-  },
-  itemPts: {
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, color: "var(--ink)",
-    background: "var(--bg)", padding: "3px 8px", borderRadius: 8, flexShrink: 0,
-  },
-  tierBadge: {
-    fontSize: 10, fontWeight: 800, color: "var(--ink)", padding: "3px 7px",
-    borderRadius: 7, flexShrink: 0,
-  },
-  iconBtn: {
-    background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 9,
-    padding: "7px", display: "flex", color: "var(--ink)", flexShrink: 0,
-  },
-  iconBtnDanger: {
-    background: "#FFE6E0", border: "none", borderRadius: 9,
-    padding: "7px", display: "flex", color: "#B5503A", flexShrink: 0,
-  },
-  iconBtnGo: {
-    background: "var(--mint)", border: "none", borderRadius: 9,
-    padding: "8px", display: "flex", color: "var(--ink)", flexShrink: 0,
-    boxShadow: "0 3px 0 #59BD98",
-  },
-  editRow: {
-    display: "flex", alignItems: "center", gap: 7, marginBottom: 7,
-    background: "#FBF7F1", border: "1.5px solid var(--gold)",
-    borderRadius: 12, padding: "8px 9px",
-  },
-  addRow: {
-    display: "flex", alignItems: "center", gap: 7, marginTop: 4,
-    background: "var(--card)", border: "1px dashed var(--line)",
-    borderRadius: 12, padding: "8px 9px",
-  },
-  editInput: {
-    flex: 1, minWidth: 0, border: "1px solid var(--line)", borderRadius: 9,
-    padding: "9px 10px", fontSize: 13.5, fontWeight: 600, color: "var(--ink)",
-    background: "#fff", outline: "none",
-  },
-  editPts: {
-    width: 58, border: "1px solid var(--line)", borderRadius: 9,
-    padding: "9px 6px", fontSize: 13.5, fontWeight: 700, color: "var(--ink)",
-    background: "#fff", outline: "none", textAlign: "center", flexShrink: 0,
-  },
-  rewardEditCard: {
-    background: "var(--card)", border: "1px solid var(--line)", borderRadius: 13,
-    padding: 11, marginBottom: 8,
-  },
-  emojiPickRow: { display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 9 },
-  emojiBtn: {
-    width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line)",
-    background: "#fff", fontSize: 15, display: "flex", alignItems: "center",
-    justifyContent: "center", padding: 0,
-  },
-  emojiActive: { borderColor: "var(--coral)", background: "#FFEDE7", borderWidth: 2 },
-  select: {
-    border: "1px solid var(--line)", borderRadius: 9, padding: "9px 8px",
-    fontSize: 13, fontWeight: 700, color: "var(--ink)", background: "#fff",
-    outline: "none", flex: 1,
-  },
-
-  /* auth */
-  authWrap: {
-    padding: "30px 22px", display: "flex", flexDirection: "column", gap: 14,
-  },
-  authBrand: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 },
-  authH1: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, margin: "8px 0 4px" },
-  authSub: { fontSize: 13.5, color: "var(--mute)", fontWeight: 600, marginBottom: 10 },
-  authInput: {
-    width: "100%", border: "1.5px solid var(--line)", borderRadius: 12,
-    padding: "14px 14px", fontSize: 15, fontWeight: 600, color: "var(--ink)",
-    background: "#fff", outline: "none",
-  },
-  authToggle: {
-    background: "none", border: "none", color: "var(--mute)", fontSize: 13,
-    fontWeight: 700, textDecoration: "underline", marginTop: 6, alignSelf: "center",
-  },
-  authErr: {
-    background: "#FFE6E0", color: "#B5503A", fontSize: 13, fontWeight: 700,
-    borderRadius: 11, padding: "10px 12px",
-  },
-  authInfo: {
-    background: "#FFF1DC", color: "#8A6B2E", fontSize: 12.5, fontWeight: 600,
-    borderRadius: 11, padding: "10px 12px", lineHeight: 1.45,
   },
 
   /* today panel */
   todayPanel: {
-    background: "var(--card)", border: "1.5px solid var(--gold)",
-    borderRadius: 16, padding: "12px 14px", marginTop: 14,
-    display: "flex", alignItems: "center", gap: 11,
+    background: "var(--surface)", border: "1.5px solid var(--ink)",
+    borderRadius: 18, padding: "14px 16px", marginTop: 18,
+    display: "flex", alignItems: "center", gap: 12,
+    boxShadow: "3px 3px 0 var(--ink)",
   },
   todayEmoji: {
-    fontSize: 22, background: "#FFF1DC",
-    width: 38, height: 38, borderRadius: 12,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    flexShrink: 0,
+    fontSize: 26, flexShrink: 0,
   },
-  todayLine: { fontSize: 13.5, fontWeight: 700, lineHeight: 1.35 },
-  todaySub: { fontSize: 11.5, color: "var(--mute)", fontWeight: 700, marginTop: 2 },
+  todayLine: {
+    fontSize: 14, fontWeight: 600, lineHeight: 1.35, color: "var(--ink)",
+    letterSpacing: "-0.005em",
+  },
+  todaySub: { fontSize: 11.5, color: "var(--mute)", fontWeight: 500, marginTop: 3, letterSpacing: 0.1 },
 
-  /* avatar in header */
+  /* video prompt */
+  promptCard: {
+    background: "var(--slime)", border: "1.5px solid var(--ink)",
+    borderRadius: 22, padding: 20, marginBottom: 16,
+    position: "relative", overflow: "hidden",
+    boxShadow: "4px 4px 0 var(--ink)",
+  },
+  promptKicker: {
+    fontSize: 10, fontWeight: 700, color: "var(--ink)",
+    letterSpacing: 2, textTransform: "uppercase",
+  },
+  promptText: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, color: "var(--ink)",
+    margin: "10px 0 14px", lineHeight: 1.2, letterSpacing: "-0.03em", fontWeight: 700,
+  },
+  promptSwap: {
+    display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600,
+    background: "var(--ink)", border: "none",
+    borderRadius: 999, padding: "8px 14px", color: "var(--slime)",
+  },
+  stage: {
+    position: "relative", background: "#000", borderRadius: 22,
+    overflow: "hidden", aspectRatio: "3/4", display: "flex",
+    alignItems: "center", justifyContent: "center", marginBottom: 14,
+    border: "1.5px solid var(--ink)",
+    boxShadow: "4px 4px 0 var(--ink)",
+  },
+  videoEl: { width: "100%", height: "100%", objectFit: "cover" },
+  stagePlaceholder: {
+    position: "absolute", display: "flex", flexDirection: "column",
+    alignItems: "center", gap: 10, color: "#fff", fontSize: 13.5, fontWeight: 500,
+    textAlign: "center", padding: 20,
+  },
+
+  /* buttons */
+  primaryBtn: {
+    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+    background: "var(--ink)",
+    color: "var(--slime)", border: "1.5px solid var(--ink)", borderRadius: 16,
+    padding: "16px", fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 700,
+    boxShadow: "4px 4px 0 var(--slimeDeep)", width: "100%",
+    letterSpacing: "-0.015em",
+  },
+  ghostBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+    background: "var(--surface)", color: "var(--ink)",
+    border: "1.5px solid var(--ink)",
+    borderRadius: 16, padding: "16px 20px", fontFamily: "'Space Grotesk', sans-serif",
+    fontSize: 14.5, fontWeight: 600,
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  videoNote: {
+    fontSize: 12, color: "var(--mute)", fontWeight: 500, marginTop: 14,
+    padding: "12px 14px", lineHeight: 1.5,
+    background: "var(--bg)", borderRadius: 12,
+    border: "1.5px solid var(--lineSoft)",
+  },
+  videoLogRow: {
+    display: "flex", alignItems: "center", gap: 12, background: "var(--surface)",
+    border: "1.5px solid var(--ink)", borderRadius: 16, padding: 12, marginBottom: 9,
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  videoLogPrompt: {
+    fontSize: 13.5, fontWeight: 600, whiteSpace: "nowrap",
+    overflow: "hidden", textOverflow: "ellipsis", color: "var(--ink)",
+  },
+  videoLogDate: { fontSize: 11.5, color: "var(--mute)", fontWeight: 500, marginTop: 3 },
+
+  /* reward store */
+  rewardRow: {
+    display: "flex", alignItems: "center", gap: 13, background: "var(--surface)",
+    border: "1.5px solid var(--ink)", borderRadius: 18, padding: 14, marginBottom: 10,
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  rewardEmoji: { fontSize: 30 },
+  rewardLabel: { fontWeight: 700, fontSize: 15, color: "var(--ink)", letterSpacing: "-0.01em" },
+  rewardCost: { fontSize: 12.5, color: "var(--mute)", fontWeight: 600, marginTop: 2 },
+  redeemBtn: {
+    background: "var(--slime)",
+    color: "var(--ink)", border: "1.5px solid var(--ink)",
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13,
+    padding: "11px 18px", borderRadius: 12, boxShadow: "3px 3px 0 var(--ink)",
+    letterSpacing: "-0.01em",
+  },
+  redeemLocked: {
+    background: "var(--bg)", boxShadow: "none",
+    color: "var(--mute)", border: "1.5px solid var(--lineSoft)",
+  },
+  redeemedRow: {
+    display: "flex", alignItems: "center", gap: 11, fontSize: 13.5, fontWeight: 600,
+    padding: "11px 14px", background: "var(--surface)", border: "1.5px solid var(--ink)",
+    borderRadius: 14, marginBottom: 8, color: "var(--ink)",
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  redeemedDate: { fontSize: 11.5, color: "var(--mute)", fontWeight: 500 },
+
+  /* auth */
+  authWrap: {
+    padding: "60px 26px 30px", display: "flex", flexDirection: "column", gap: 14,
+    position: "relative", minHeight: "calc(100vh - 60px)",
+  },
+  authBrand: { display: "flex", alignItems: "baseline", gap: 3, marginBottom: 20 },
+  authH1: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 48, margin: "12px 0 6px",
+    color: "var(--ink)", letterSpacing: "-0.045em", fontWeight: 700, lineHeight: 1,
+  },
+  authSub: { fontSize: 14, color: "var(--mute)", fontWeight: 500, marginBottom: 12, lineHeight: 1.5 },
+  authInput: {
+    width: "100%", border: "1.5px solid var(--ink)", borderRadius: 14,
+    padding: "16px 16px", fontSize: 15, fontWeight: 500, color: "var(--ink)",
+    background: "var(--surface)", outline: "none",
+  },
+  authToggle: {
+    background: "none", border: "none", color: "var(--ink)", fontSize: 13,
+    fontWeight: 700, marginTop: 8, alignSelf: "center", letterSpacing: "-0.005em",
+    textDecoration: "underline", textDecorationColor: "var(--slime)",
+    textDecorationThickness: 3, textUnderlineOffset: 4,
+  },
+  authErr: {
+    background: "#FFE6E0", color: "#B5503A", fontSize: 13, fontWeight: 600,
+    borderRadius: 12, padding: "12px 14px", border: "1.5px solid #B5503A",
+  },
+  authInfo: {
+    background: "var(--slime)", color: "var(--ink)", fontSize: 12.5, fontWeight: 600,
+    borderRadius: 12, padding: "12px 14px", lineHeight: 1.5,
+    border: "1.5px solid var(--ink)",
+  },
+
+  /* ===== PARENT HOME ===== */
+  parentGreeting: {
+    position: "relative",
+    background: "var(--ink)",
+    border: "1.5px solid var(--ink)",
+    borderRadius: 26, padding: "26px 22px", color: "#fff",
+    overflow: "hidden",
+    boxShadow: "5px 5px 0 var(--slime)",
+  },
+  parentGreetDate: {
+    fontSize: 11, fontWeight: 700, letterSpacing: 2.5, textTransform: "uppercase",
+    color: "var(--slime)", marginBottom: 8,
+  },
+  parentGreetH: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 30,
+    lineHeight: 1.05, letterSpacing: "-0.04em", margin: "2px 0 12px", color: "#fff",
+  },
+  parentGreetSub: { fontSize: 14.5, fontWeight: 500, color: "#FFF8", lineHeight: 1.5 },
+
+  weekBand: {
+    display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9,
+    marginTop: 18, marginBottom: 18,
+  },
+  weekCard: {
+    background: "var(--surface)", borderRadius: 18, padding: "14px 8px",
+    border: "1.5px solid var(--ink)", textAlign: "center",
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  weekCardEmoji: { fontSize: 20, marginBottom: 4 },
+  weekCardNum: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22,
+    color: "var(--ink)", letterSpacing: "-0.025em",
+  },
+  weekCardLabel: { fontSize: 10, color: "var(--mute)", fontWeight: 600, marginTop: 1, letterSpacing: 1 },
+
+  blockTitle: {
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 11,
+    margin: "26px 0 12px", display: "flex", alignItems: "center", gap: 8,
+    textTransform: "uppercase", letterSpacing: 2, color: "var(--mute)",
+  },
+
+  latestVideoCard: {
+    display: "flex", alignItems: "center", gap: 13, background: "var(--gum)",
+    border: "1.5px solid var(--ink)", borderRadius: 20, padding: 13,
+    textDecoration: "none", color: "inherit",
+    boxShadow: "4px 4px 0 var(--ink)",
+  },
+  latestVideoThumb: {
+    width: 68, height: 84, borderRadius: 14, objectFit: "cover",
+    background: "#000", flexShrink: 0, border: "1.5px solid var(--ink)",
+  },
+  latestVideoTag: {
+    fontSize: 9.5, fontWeight: 700, letterSpacing: 1.6, color: "#fff",
+    textTransform: "uppercase",
+  },
+  latestVideoPrompt: { fontSize: 13.5, fontWeight: 700, lineHeight: 1.3, marginTop: 5, color: "#fff" },
+  latestVideoDate: { fontSize: 11.5, color: "#FFF9", fontWeight: 500, marginTop: 5 },
+
+  rewardProgressCard: {
+    background: "var(--slime)", border: "1.5px solid var(--ink)",
+    borderRadius: 20, padding: 16,
+    boxShadow: "4px 4px 0 var(--ink)",
+  },
+  rewardProgressTop: { display: "flex", alignItems: "center", gap: 12, marginBottom: 12 },
+  rewardProgressEmoji: { fontSize: 36 },
+  rewardProgressLabel: { fontWeight: 700, fontSize: 16, color: "var(--ink)", lineHeight: 1.25, letterSpacing: "-0.015em" },
+  rewardProgressSub: { fontSize: 11.5, color: "var(--ink)", opacity: 0.7, fontWeight: 600, marginTop: 3 },
+  miniProgress: { background: "#fff", height: 12, borderRadius: 999, overflow: "hidden", border: "1.5px solid var(--ink)" },
+  miniProgressFill: {
+    height: "100%", background: "var(--gum)",
+    borderRadius: 999, transition: "width .6s cubic-bezier(.2,.8,.3,1)",
+  },
+
+  latelyRow: {
+    display: "flex", alignItems: "center", gap: 12, background: "var(--surface)",
+    border: "1.5px solid var(--ink)", borderRadius: 16, padding: 12, marginBottom: 9,
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  latelyText: { flex: 1, minWidth: 0 },
+  latelyLabel: { fontWeight: 600, fontSize: 13.5, lineHeight: 1.3, color: "var(--ink)", letterSpacing: "-0.005em" },
+  latelyMeta: { fontSize: 11.5, color: "var(--mute)", fontWeight: 500, marginTop: 3 },
+  latelyPts: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, color: "var(--ink)",
+    background: "var(--slime)", padding: "5px 12px", border: "1.5px solid var(--ink)",
+    borderRadius: 10, flexShrink: 0, fontWeight: 700,
+  },
+  latelyPtsDeclined: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, color: "#B5503A",
+    background: "#FFE6E0", padding: "5px 12px", border: "1.5px solid #B5503A",
+    borderRadius: 10, flexShrink: 0, fontWeight: 700,
+  },
+
+  parentHead: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
+  exitBtn: {
+    display: "flex", alignItems: "center", gap: 5, background: "var(--surface)",
+    border: "1.5px solid var(--ink)", borderRadius: 11, padding: "9px 13px",
+    fontWeight: 700, fontSize: 12.5, color: "var(--ink)",
+    boxShadow: "2px 2px 0 var(--ink)",
+  },
+  modeRow: { display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" },
+  modeBtn: {
+    flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    background: "var(--surface)", border: "1.5px solid var(--ink)", borderRadius: 12,
+    padding: "10px 8px", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 12.5,
+    color: "var(--ink)", minWidth: 90, letterSpacing: "-0.005em",
+  },
+  modeActive: {
+    background: "var(--ink)",
+    color: "var(--slime)", borderColor: "var(--ink)",
+    boxShadow: "2px 2px 0 var(--slime)",
+  },
+
+  approvalCard: {
+    display: "flex", alignItems: "center", gap: 12, background: "var(--sun)",
+    border: "1.5px solid var(--ink)", borderRadius: 18, padding: 13, marginBottom: 11,
+    boxShadow: "4px 4px 0 var(--ink)",
+  },
+  approveBtn: {
+    display: "flex", alignItems: "center", gap: 5,
+    background: "var(--slime)",
+    color: "var(--ink)", border: "1.5px solid var(--ink)", borderRadius: 12, padding: "12px 14px",
+    fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13,
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  declineBtn: {
+    background: "#FFE6E0", color: "#B5503A",
+    border: "1.5px solid var(--ink)", borderRadius: 12,
+    padding: "12px 13px", display: "flex", alignItems: "center",
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  emptyBox: {
+    display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+    padding: "36px 22px", color: "var(--mute)", fontSize: 13.5, fontWeight: 500,
+    background: "var(--surface)",
+    border: "1.5px dashed var(--ink)", borderRadius: 18,
+  },
+  signOutBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    width: "100%", marginTop: 28, background: "transparent", border: "1.5px solid var(--lineSoft)",
+    color: "var(--mute)", borderRadius: 12, padding: "13px", fontWeight: 500, fontSize: 12.5,
+  },
+
+  /* editors */
+  itemRow: {
+    display: "flex", alignItems: "center", gap: 8, background: "var(--surface)",
+    border: "1.5px solid var(--ink)", borderRadius: 13, padding: "11px 13px", marginBottom: 8,
+    boxShadow: "2px 2px 0 var(--ink)",
+  },
+  itemPts: {
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 13, color: "var(--ink)",
+    background: "var(--slime)", padding: "4px 10px", border: "1.5px solid var(--ink)",
+    borderRadius: 9, flexShrink: 0, fontWeight: 700,
+  },
+  tierBadge: {
+    fontSize: 10, fontWeight: 700, color: "var(--ink)", padding: "4px 9px",
+    borderRadius: 7, flexShrink: 0, letterSpacing: 0.4,
+    border: "1.5px solid var(--ink)",
+  },
+  iconBtn: {
+    background: "var(--bg)", border: "1.5px solid var(--ink)", borderRadius: 10,
+    padding: "8px", display: "flex", color: "var(--ink)", flexShrink: 0,
+  },
+  iconBtnDanger: {
+    background: "#FFE6E0", border: "1.5px solid var(--ink)", borderRadius: 10,
+    padding: "8px", display: "flex", color: "#B5503A", flexShrink: 0,
+  },
+  iconBtnGo: {
+    background: "var(--slime)", border: "1.5px solid var(--ink)", borderRadius: 10,
+    padding: "9px", display: "flex", color: "var(--ink)", flexShrink: 0,
+    boxShadow: "2px 2px 0 var(--ink)",
+  },
+  editRow: {
+    display: "flex", alignItems: "center", gap: 7, marginBottom: 7,
+    background: "var(--sun)", border: "1.5px solid var(--ink)",
+    borderRadius: 13, padding: "9px 10px",
+  },
+  addRow: {
+    display: "flex", alignItems: "center", gap: 7, marginTop: 4,
+    background: "var(--surface)", border: "1.5px dashed var(--ink)",
+    borderRadius: 13, padding: "9px 10px",
+  },
+  editInput: {
+    flex: 1, minWidth: 0, border: "1.5px solid var(--ink)", borderRadius: 10,
+    padding: "10px 12px", fontSize: 13.5, fontWeight: 500, color: "var(--ink)",
+    background: "var(--surface)", outline: "none",
+  },
+  editPts: {
+    width: 62, border: "1.5px solid var(--ink)", borderRadius: 10,
+    padding: "10px 6px", fontSize: 13.5, fontWeight: 700, color: "var(--ink)",
+    background: "var(--surface)", outline: "none", textAlign: "center", flexShrink: 0,
+  },
+  rewardEditCard: {
+    background: "var(--surface)", border: "1.5px solid var(--ink)", borderRadius: 14,
+    padding: 12, marginBottom: 10,
+    boxShadow: "3px 3px 0 var(--ink)",
+  },
+  emojiPickRow: { display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 10 },
+  emojiBtn: {
+    width: 34, height: 34, borderRadius: 9, border: "1.5px solid var(--ink)",
+    background: "var(--surface)", fontSize: 16, display: "flex", alignItems: "center",
+    justifyContent: "center", padding: 0,
+  },
+  emojiActive: { background: "var(--slime)" },
+  select: {
+    border: "1.5px solid var(--ink)", borderRadius: 10, padding: "10px 8px",
+    fontSize: 13, fontWeight: 600, color: "var(--ink)", background: "var(--surface)",
+    outline: "none", flex: 1,
+  },
+
+  /* avatar / personalize */
   avatarChip: {
-    width: 36, height: 36, borderRadius: 12,
+    width: 40, height: 40, borderRadius: 12,
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: 18, flexShrink: 0, marginRight: 9,
-    border: "2px solid #fff", boxShadow: "0 3px 0 rgba(0,0,0,.08)",
+    fontSize: 20, flexShrink: 0, marginRight: 10,
+    background: "var(--surface)", border: "1.5px solid var(--ink)",
+    boxShadow: "2px 2px 0 var(--ink)",
   },
-
-  /* personalize page */
   personalizeRow: {
     display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8,
     marginBottom: 14,
   },
   personalizeBtn: {
-    aspectRatio: "1 / 1", borderRadius: 14, border: "1.5px solid var(--line)",
-    background: "var(--card)", fontSize: 22, display: "flex",
+    aspectRatio: "1 / 1", borderRadius: 14, border: "1.5px solid var(--ink)",
+    background: "var(--surface)", fontSize: 22, display: "flex",
     alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer",
   },
   personalizeActive: {
-    borderColor: "var(--ink)", borderWidth: 2.5,
-    boxShadow: "0 4px 0 rgba(58,42,77,.15)",
+    background: "var(--slime)",
+    boxShadow: "3px 3px 0 var(--ink)",
   },
   themeSwatch: {
-    aspectRatio: "1 / 1", borderRadius: 14, border: "2.5px solid #fff",
-    cursor: "pointer", boxShadow: "0 0 0 1.5px var(--line)",
+    aspectRatio: "1 / 1", borderRadius: 14, border: "1.5px solid var(--ink)",
+    cursor: "pointer",
   },
-  themeSwatchActive: { boxShadow: "0 0 0 3px var(--ink)" },
+  themeSwatchActive: { boxShadow: "3px 3px 0 var(--ink)", transform: "scale(1.05)" },
 
-  /* mini badge inline */
   miniBadge: {
     display: "inline-flex", alignItems: "center", gap: 5,
-    background: "#FFF1DC", color: "#8A6B2E", fontWeight: 800,
-    fontSize: 11, padding: "3px 8px", borderRadius: 8,
+    background: "var(--slime)", color: "var(--ink)", fontWeight: 700,
+    fontSize: 11, padding: "4px 9px", borderRadius: 8, letterSpacing: 0.2,
+    border: "1.5px solid var(--ink)",
   },
 
-  /* ===== Parent Home (the new warm landing) ===== */
-  parentGreeting: {
-    background: "linear-gradient(135deg, #FF9F1C 0%, #FF5C4D 55%, #E04891 110%)",
-    borderRadius: 28, padding: "24px 22px 28px", color: "#fff",
-    boxShadow: "0 16px 38px rgba(255,92,77,.32), inset 0 1px 0 rgba(255,255,255,.22)",
-    position: "relative", overflow: "hidden",
-  },
-  parentGreetDate: {
-    fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase",
-    opacity: 0.9, marginBottom: 6,
-  },
-  parentGreetH: {
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 28,
-    lineHeight: 1.1, letterSpacing: "-0.025em", margin: "2px 0 10px",
-  },
-  parentGreetSub: { fontSize: 14.5, fontWeight: 600, opacity: 0.95, lineHeight: 1.45 },
-
-  weekBand: {
-    display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 9,
-    marginTop: 16, marginBottom: 16,
-  },
-  weekCard: {
-    background: "var(--card)", borderRadius: 20, padding: "14px 8px",
-    border: "1px solid var(--line)", textAlign: "center",
-    boxShadow: "0 2px 0 var(--line), 0 4px 16px rgba(0,0,0,.03)",
-  },
-  weekCardEmoji: { fontSize: 22, marginBottom: 4 },
-  weekCardNum: { fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em" },
-  weekCardLabel: { fontSize: 10.5, color: "var(--mute)", fontWeight: 700, marginTop: 1, letterSpacing: 0.3 },
-
-  blockTitle: {
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, fontSize: 13.5,
-    margin: "24px 0 12px", display: "flex", alignItems: "center", gap: 8,
-    textTransform: "uppercase", letterSpacing: 0.8, color: "var(--mute)",
-  },
-
-  /* latest video preview card */
-  latestVideoCard: {
-    display: "flex", alignItems: "center", gap: 12, background: "var(--card)",
-    border: "1.5px solid var(--berry)", borderRadius: 18, padding: 12,
-    textDecoration: "none", color: "inherit",
-    boxShadow: "0 4px 0 rgba(228,91,160,.18)",
-  },
-  latestVideoThumb: {
-    width: 64, height: 80, borderRadius: 12, objectFit: "cover",
-    background: "#2B2238", flexShrink: 0,
-  },
-  latestVideoTag: {
-    fontSize: 10, fontWeight: 800, letterSpacing: 0.6, color: "var(--berry)",
-    textTransform: "uppercase",
-  },
-  latestVideoPrompt: { fontSize: 13.5, fontWeight: 700, lineHeight: 1.3, marginTop: 4 },
-  latestVideoDate: { fontSize: 11, color: "var(--mute)", fontWeight: 700, marginTop: 5 },
-
-  /* reward progress card on parent home */
-  rewardProgressCard: {
-    background: "var(--card)", border: "1.5px solid var(--gold)", borderRadius: 18,
-    padding: 14, boxShadow: "0 4px 0 rgba(255,182,39,.22)",
-  },
-  rewardProgressTop: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 },
-  rewardProgressEmoji: { fontSize: 30 },
-  rewardProgressLabel: { fontWeight: 800, fontSize: 14.5, lineHeight: 1.25 },
-  rewardProgressSub: { fontSize: 11.5, color: "var(--mute)", fontWeight: 700, marginTop: 2 },
-  miniProgress: { background: "#FBE6BE", height: 10, borderRadius: 6, overflow: "hidden" },
-  miniProgressFill: {
-    height: "100%", background: "linear-gradient(90deg, var(--gold), var(--coral))",
-    borderRadius: 6, transition: "width .5s ease",
-  },
-
-  /* Lately feed item */
-  latelyRow: {
-    display: "flex", alignItems: "center", gap: 11, background: "var(--card)",
-    border: "1px solid var(--line)", borderRadius: 15, padding: 11, marginBottom: 8,
-  },
-  latelyText: { flex: 1, minWidth: 0 },
-  latelyLabel: { fontWeight: 700, fontSize: 13.5, lineHeight: 1.3 },
-  latelyMeta: { fontSize: 11, color: "var(--mute)", fontWeight: 700, marginTop: 3 },
-  latelyPts: {
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, color: "var(--ink)",
-    background: "linear-gradient(135deg, var(--mint), #88E5C2)", padding: "5px 11px",
-    borderRadius: 10, flexShrink: 0, fontWeight: 600,
-  },
-  latelyPtsDeclined: {
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 13, color: "#B5503A",
-    background: "#FFE6E0", padding: "5px 11px", borderRadius: 10, flexShrink: 0, fontWeight: 600,
-  },
-
-  /* kid "on a roll" banner */
-  onARoll: {
-    background: "linear-gradient(135deg, var(--mint), var(--sky))",
-    color: "#fff", borderRadius: 18, padding: "13px 16px",
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 600, fontSize: 14,
-    display: "flex", alignItems: "center", gap: 10, marginTop: 14,
-    boxShadow: "0 8px 22px rgba(93,211,171,.32)",
-  },
-
-  /* nicer shortcut tile (bigger emoji-vibe icon, more pop) */
-  shortcutBright: {
-    width: "100%", display: "flex", alignItems: "center", gap: 14,
-    background: "var(--card)", border: "1px solid var(--line)",
-    borderRadius: 22, padding: 15, marginBottom: 10,
-    boxShadow: "0 2px 0 var(--line), 0 6px 20px rgba(0,0,0,.04)",
-  },
-  shortcutBrightIcon: {
-    width: 48, height: 48, borderRadius: 16, display: "flex",
-    alignItems: "center", justifyContent: "center", flexShrink: 0,
-    boxShadow: "0 4px 12px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.25)",
-  },
-
+  /* toast */
   toast: {
-    position: "fixed", bottom: 92, left: "50%", transform: "translateX(-50%)",
-    background: "var(--ink)", color: "#fff", padding: "11px 18px", borderRadius: 14,
-    fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14, fontWeight: 600,
-    boxShadow: "0 8px 24px rgba(0,0,0,.25)", zIndex: 50, whiteSpace: "nowrap",
-    maxWidth: "90%",
+    position: "fixed", bottom: 102, left: "50%", transform: "translateX(-50%)",
+    background: "var(--ink)", color: "var(--slime)", padding: "13px 22px", borderRadius: 999,
+    fontFamily: "'Space Grotesk', sans-serif", fontSize: 14, fontWeight: 600,
+    boxShadow: "4px 4px 0 var(--slime)", zIndex: 50, whiteSpace: "nowrap",
+    maxWidth: "88%", letterSpacing: "-0.01em",
+    border: "1.5px solid var(--ink)",
   },
+
+  /* bottom nav */
   nav: {
     position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-    width: "100%", maxWidth: 480, background: "rgba(255,255,255,.92)",
-    backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-    borderTop: "1px solid var(--line)", display: "flex",
-    padding: "10px 6px calc(12px + env(safe-area-inset-bottom))",
+    width: "100%", maxWidth: 480,
+    background: "var(--surface)",
+    borderTop: "1.5px solid var(--ink)", display: "flex",
+    padding: "10px 6px calc(14px + env(safe-area-inset-bottom))",
     justifyContent: "space-around", zIndex: 40,
   },
   navBtn: {
     background: "none", border: "none", display: "flex", flexDirection: "column",
-    alignItems: "center", gap: 3, color: "var(--mute)", padding: "4px 8px", cursor: "pointer",
+    alignItems: "center", gap: 3, color: "var(--mute2)", padding: "4px 8px", cursor: "pointer",
   },
   navActive: { color: "var(--ink)" },
-  navLabel: { fontSize: 10.5, fontWeight: 800 },
+  navLabel: { fontSize: 10, fontWeight: 700, letterSpacing: 0.4 },
   navBadge: {
-    position: "absolute", top: -5, right: -8, background: "var(--coral)",
-    color: "#fff", fontSize: 10, fontWeight: 800, minWidth: 16, height: 16,
-    borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px",
+    position: "absolute", top: -5, right: -8,
+    background: "var(--gum)",
+    color: "#fff", fontSize: 10, fontWeight: 700, minWidth: 17, height: 17,
+    borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px",
+    border: "1.5px solid var(--ink)",
+  },
+
+  miniStreakChip: {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    fontSize: 12, color: "var(--ink)", fontWeight: 700, letterSpacing: 0.2,
+    background: "var(--slime)", padding: "3px 9px", borderRadius: 999,
+    border: "1.5px solid var(--ink)",
   },
 }
 
 export const TIERS = ["Small", "Medium", "Large"]
-export const TIER_COLORS = { Small: "var(--mint)", Medium: "var(--gold)", Large: "var(--coral)" }
+export const TIER_COLORS = { Small: "var(--slime)", Medium: "var(--sun)", Large: "var(--gum)" }
 export const EMOJI_CHOICES = [
   "💄","💅","🌸","💎","👛","🎀","💍","👜","🕶️","💖","🎧","🎮",
   "📚","🎨","🍕","🍦","🎬","💳","🎡","🛍️","⭐","🧸","🛹","🎁","✨"
@@ -580,23 +868,20 @@ export const VIDEO_PROMPTS = [
 export const VIDEO_PTS = 25
 export const todayKey = () => new Date().toISOString().slice(0, 10)
 
-/* avatar emoji choices for the kid to pick */
 export const AVATAR_CHOICES = [
   "🦄","🌸","🌈","⭐","🦋","🌻","🍓","🐱","🐰","🦊","🐼","🐻",
   "🐢","🦔","🌙","☀️","💫","✨","🎀","🪐","🍑","🍉"
 ]
 
-/* theme presets: each sets the --gold (accent) + --lav (hero gradient) vars */
 export const THEMES = [
-  { id: "sunset",  label: "Sunset",   gold: "#FFC95C", goldDark: "#E0A93F", lav: "#C9B6F0", lavDark: "#B49BE8" },
-  { id: "coral",   label: "Coral",    gold: "#FF8E72", goldDark: "#D9745A", lav: "#FFB5A7", lavDark: "#FF8E72" },
-  { id: "mint",    label: "Mint",     gold: "#7FD9B8", goldDark: "#59BD98", lav: "#A8E6CF", lavDark: "#7FD9B8" },
-  { id: "berry",   label: "Berry",    gold: "#E879A6", goldDark: "#C45F8A", lav: "#D9A0E6", lavDark: "#B07FCB" },
-  { id: "sky",     label: "Sky",      gold: "#7FB8E8", goldDark: "#5A95C9", lav: "#A8C8F0", lavDark: "#7FB8E8" },
-  { id: "sunny",   label: "Sunny",    gold: "#FFD93D", goldDark: "#E0BC1F", lav: "#FFE680", lavDark: "#FFD93D" },
+  { id: "slime",   label: "Slime",    gold: "#C8FF3D", goldDark: "#9DD12E", lav: "#FF52A8", lavDark: "#D63D8E" },
+  { id: "bubble",  label: "Bubble",   gold: "#FF52A8", goldDark: "#D63D8E", lav: "#C8FF3D", lavDark: "#9DD12E" },
+  { id: "sun",     label: "Sun",      gold: "#FFCD3D", goldDark: "#D9A82E", lav: "#FF52A8", lavDark: "#D63D8E" },
+  { id: "ice",     label: "Ice",      gold: "#3DD9FF", goldDark: "#28B6D9", lav: "#C8FF3D", lavDark: "#9DD12E" },
+  { id: "ember",   label: "Ember",    gold: "#FF8A3D", goldDark: "#D9742E", lav: "#FF52A8", lavDark: "#D63D8E" },
+  { id: "lilac",   label: "Lilac",    gold: "#B98EF0", goldDark: "#9D6FE8", lav: "#C8FF3D", lavDark: "#9DD12E" },
 ]
 
-/* badges — pure functions of family + counts. Returns array of {id, label, emoji, hit}. */
 export function evaluateBadges({ family, claimsCount, videosCount, redemptionsCount, choreApprovedCount }) {
   const lifetime = family.lifetime_points || 0
   const streak = family.streak || 1
@@ -613,14 +898,13 @@ export function evaluateBadges({ family, claimsCount, videosCount, redemptionsCo
   ]
 }
 
-/* daily-changing today-line copy */
 export function todayLine(family, approvedTodayCount) {
   const lines = [
-    `${approvedTodayCount > 0 ? approvedTodayCount + ' down today — keep going!' : 'Fresh day, fresh quests.'}`,
-    `Pick one easy win to start the day strong.`,
-    `Today's a great day to record a reflection (+${VIDEO_PTS} pts).`,
-    `You've earned ${family.lifetime_points || 0} pts so far. ✨`,
-    `${family.streak || 1}-day streak. Don't break the chain.`,
+    `${approvedTodayCount > 0 ? approvedTodayCount + " down today. keep cooking." : "Fresh day. make it count."}`,
+    `Drop a reflection — ${VIDEO_PTS} pts, takes a minute.`,
+    `${family.lifetime_points || 0} lifetime pts. that's all you.`,
+    `${family.streak || 1}-day streak. don't break the chain.`,
+    `One quick win starts the day right.`,
   ]
   const idx = new Date().getDate() % lines.length
   return lines[idx]

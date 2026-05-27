@@ -119,11 +119,11 @@ function AuthScreen() {
       <style>{CSS}</style>
       <div style={S.authWrap} className="rq-fade">
         <div style={S.authBrand}>
-          <Sparkles size={22} style={{ color: 'var(--gold)' }} />
-          <span style={{ ...S.brandName, fontSize: 22 }}>RewardQuest</span>
+          <span style={S.brandName}>rewardquest</span>
+          <span style={S.brandDot} className="rq-dot" />
         </div>
         <h1 style={S.authH1}>
-          {mode === 'signup' ? 'Create account' : 'Welcome back'}
+          {mode === 'signup' ? 'let\u2019s go.' : 'welcome back.'}
         </h1>
         <p style={S.authSub}>
           {mode === 'signup'
@@ -199,7 +199,7 @@ function AppHeader({ family, role, onSignOut }) {
           <span style={S.brandName}>RewardQuest</span>
         </div>
         <div style={S.whoami}>
-          <Heart size={12} style={{ color: 'var(--coral)' }} />
+          <Heart size={12} style={{ color: 'var(--gum)' }} />
           {role === 'parent' ? 'Parent dashboard' : `${family.streak || 1} day${(family.streak || 1) !== 1 ? 's' : ''} in a row — keep glowing`}
         </div>
       </div>
@@ -378,26 +378,27 @@ function KidApp({ familyId, user }) {
 /* kid header with avatar + animated point total */
 function KidHeader({ family, pointsBump }) {
   const avatar = family.avatar_emoji || "✨"
-  const theme = THEMES.find(t => t.id === family.theme) || THEMES[0]
+  const streak = family.streak || 1
   return (
     <header style={S.header}>
       <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-        <div style={{ ...S.avatarChip, background: theme.lav }}>{avatar}</div>
+        <div style={S.avatarChip}>{avatar}</div>
         <div>
           <div style={S.brand}>
-            <Sparkles size={20} style={{ color: 'var(--gold)' }} />
-            <span style={S.brandName}>RewardQuest</span>
+            <span style={S.brandName}>rewardquest</span>
+            <span style={S.brandDot} className="rq-dot" />
           </div>
           <div style={S.whoami}>
-            <Heart size={12} style={{ color: 'var(--coral)' }} />
-            {family.streak || 1} day{(family.streak || 1) !== 1 ? 's' : ''} in a row — keep glowing
+            <span style={S.miniStreakChip}>🔥 {streak}d</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>let's go</span>
           </div>
         </div>
       </div>
       <div style={S.pointsBadge}>
-        <Star size={16} style={{ color: '#fff' }} />
+        <Star size={14} style={{ color: '#fff' }} />
         <span style={S.pointsNum} className={pointsBump ? 'rq-bump' : ''}>{family.points || 0}</span>
-        <span style={S.pointsLabel}>pts</span>
+        <span style={S.pointsLabel}>PTS</span>
       </div>
     </header>
   )
@@ -410,90 +411,100 @@ function KidHome({ family, rewards, pending, counts, setTab }) {
   const tLine = todayLine(family, counts.today)
   const onARoll = counts.today >= 3 || (family.streak || 1) >= 3
 
+  /* ticker tape content — repeats twice for seamless loop */
+  const tickerItems = [
+    { emoji: '✦', text: `${family.lifetime_points || 0} lifetime pts` },
+    { emoji: '✦', text: `${family.streak || 1}-day streak` },
+    { emoji: '✦', text: `${pending.length} pending` },
+    { emoji: '✦', text: `${counts.videos || 0} reflections` },
+    { emoji: '✦', text: `${counts.today || 0} today` },
+  ]
+
   return (
     <div className="rq-fade">
-      <h2 style={S.h2}>Today's quest</h2>
-      {next && (
-        <div style={S.heroCard}>
-          <div style={S.heroTop}>
-            <span style={S.heroLabel}>Next reward</span>
-            <span style={S.heroEmoji}>{next.emoji}</span>
-          </div>
-          <div style={S.heroReward}>{next.label}</div>
-          <div style={S.progressTrack}>
-            <div style={{ ...S.progressFill, width: `${pct}%` }} />
-          </div>
-          <div style={S.heroFoot}>
-            {family.points || 0} / {next.cost} pts &nbsp;·&nbsp; {pct}% there
-          </div>
+      {/* MEGA points hero — the centerpiece */}
+      <div style={S.megaPoints}>
+        <div style={S.megaPointsLabel}>your balance</div>
+        <div style={S.megaPointsNum} className="rq-glow">
+          {family.points || 0}
         </div>
-      )}
-
-      {onARoll && (
-        <div style={S.onARoll}>
-          <span style={{ fontSize: 22 }}>🔥</span>
-          <div style={{ flex: 1 }}>
-            You're on a roll! {counts.today >= 3 ? `${counts.today} today already` : `${family.streak} days running`}.
-          </div>
-        </div>
-      )}
-
-      <div style={S.todayPanel}>
-        <div style={S.todayEmoji}>☀️</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={S.todayLine}>{tLine}</div>
-          <div style={S.todaySub}>
-            {counts.today > 0
-              ? `${counts.today} approved today`
-              : 'Nothing approved yet today'}
-            {' · '}
-            {family.lifetime_points || 0} total earned
-          </div>
+        <div style={S.megaPointsSub}>
+          {onARoll
+            ? <span style={S.streakChip}>🔥 you're on a roll · {counts.today >= 3 ? `${counts.today} today` : `${family.streak} days`}</span>
+            : tLine}
         </div>
       </div>
+
+      {/* ticker tape — running marquee */}
+      <div style={S.tickerWrap}>
+        <div className="rq-ticker">
+          {[...tickerItems, ...tickerItems].map((t, i) => (
+            <span key={i} style={S.tickerItem}>
+              <span style={S.tickerDot} />
+              {t.text}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* asymmetric next-reward sticker card */}
+      {next && (
+        <div style={S.nextRewardCard} className="rq-grain">
+          <span style={S.nextRewardSticker}>next up</span>
+          <span style={S.nextRewardEmoji}>{next.emoji}</span>
+          <div style={S.nextRewardLabel}>{next.label}</div>
+          <div style={S.nextProgressTrack}>
+            <div style={{ ...S.nextProgressFill, width: `${pct}%` }} />
+          </div>
+          <div style={S.nextProgressFoot}>
+            <span>{family.points || 0} / {next.cost}</span>
+            <span style={{ opacity: 0.8 }}>{pct}%</span>
+          </div>
+        </div>
+      )}
 
       <div style={S.statRow}>
-        <Stat n={pending.length} label="Awaiting OK" />
-        <Stat n={family.lifetime_points || 0} label="Total earned" />
-        <Stat n={family.streak || 1} label="Day streak" />
+        <Stat n={pending.length} label="Pending" />
+        <Stat n={family.lifetime_points || 0} label="Lifetime" />
+        <Stat n={family.streak || 1} label="Streak" />
       </div>
 
-      <h3 style={S.h3}>Jump in</h3>
+      <h3 style={S.h3}>What's next</h3>
       <button onClick={() => setTab('tasks')} style={S.shortcutBright} className="rq-press">
-        <div style={{ ...S.shortcutBrightIcon, background: 'var(--mint)' }}>
-          <CheckCircle2 size={22} style={{ color: '#fff' }} />
+        <div style={{ ...S.shortcutBrightIcon, background: 'linear-gradient(135deg, #C8FF3D, #9DD12E)' }}>
+          <CheckCircle2 size={22} style={{ color: '#0E0716' }} />
         </div>
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={S.shortcutTitle}>Log a quest</div>
-          <div style={S.shortcutSub}>Snap proof · parent confirms</div>
+          <div style={S.shortcutTitle}>Drop a quest</div>
+          <div style={S.shortcutSub}>snap proof · stack points</div>
         </div>
-        <ChevronRight size={18} style={{ color: 'var(--line)' }} />
+        <ChevronRight size={18} style={{ color: 'var(--mute)' }} />
       </button>
       <button onClick={() => setTab('video')} style={S.shortcutBright} className="rq-press">
-        <div style={{ ...S.shortcutBrightIcon, background: 'var(--coral)' }}>
+        <div style={{ ...S.shortcutBrightIcon, background: 'linear-gradient(135deg, #FF52A8, #8C5AFF)' }}>
           <Camera size={22} style={{ color: '#fff' }} />
         </div>
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={S.shortcutTitle}>Record a reflection</div>
-          <div style={S.shortcutSub}>Tell us your story — worth {VIDEO_PTS} pts</div>
+          <div style={S.shortcutTitle}>Record a vibe</div>
+          <div style={S.shortcutSub}>quick reflection · +{VIDEO_PTS} pts</div>
         </div>
-        <ChevronRight size={18} style={{ color: 'var(--line)' }} />
+        <ChevronRight size={18} style={{ color: 'var(--mute)' }} />
       </button>
       <button onClick={() => setTab('store')} style={S.shortcutBright} className="rq-press">
-        <div style={{ ...S.shortcutBrightIcon, background: 'var(--gold)' }}>
-          <Gift size={22} style={{ color: '#fff' }} />
+        <div style={{ ...S.shortcutBrightIcon, background: 'linear-gradient(135deg, #FFCD3D, #FF8A3D)' }}>
+          <Gift size={22} style={{ color: '#0E0716' }} />
         </div>
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={S.shortcutTitle}>Visit the reward store</div>
-          <div style={S.shortcutSub}>Spend points or save up</div>
+          <div style={S.shortcutTitle}>Cash in</div>
+          <div style={S.shortcutSub}>spend or save · your call</div>
         </div>
-        <ChevronRight size={18} style={{ color: 'var(--line)' }} />
+        <ChevronRight size={18} style={{ color: 'var(--mute)' }} />
       </button>
 
       {pending.length > 0 && (
         <div style={S.pendingNote}>
           <Clock size={14} />
-          {pending.length} thing{pending.length !== 1 ? 's' : ''} waiting for a parent to confirm.
+          {pending.length} thing{pending.length !== 1 ? 's' : ''} pending parent approval
         </div>
       )}
     </div>
@@ -515,7 +526,7 @@ function KidTasks({ family, tasks, decisions, pending, onSubmit }) {
       </div>
 
       <div style={S.sectionTag}>
-        <Circle size={13} style={{ color: 'var(--mint)' }} />
+        <Circle size={13} style={{ color: 'var(--slime)' }} />
         Daily tasks · small points
       </div>
       <p style={S.sectionHint}>Everyday stuff. Resets fresh each day.</p>
@@ -855,24 +866,23 @@ function ParentApp({ familyId, user }) {
   )
 }
 
-/* parent-view header — no avatar, shows "Parent dashboard" tagline */
+/* parent-view header */
 function ParentHeader({ family, pointsBump }) {
   return (
     <header style={S.header}>
       <div>
         <div style={S.brand}>
-          <Sparkles size={20} style={{ color: 'var(--gold)' }} />
-          <span style={S.brandName}>RewardQuest</span>
+          <span style={S.brandName}>rewardquest</span>
+          <span style={S.brandDot} className="rq-dot" />
         </div>
         <div style={S.whoami}>
-          <Heart size={12} style={{ color: 'var(--coral)' }} />
-          Parent dashboard
+          <span style={{ opacity: 0.7 }}>parent view</span>
         </div>
       </div>
       <div style={S.pointsBadge}>
-        <Star size={16} style={{ color: '#fff' }} />
+        <Star size={14} style={{ color: 'var(--ink)' }} />
         <span style={S.pointsNum} className={pointsBump ? 'rq-bump' : ''}>{family.points || 0}</span>
-        <span style={S.pointsLabel}>pts</span>
+        <span style={S.pointsLabel}>PTS</span>
       </div>
     </header>
   )
@@ -899,7 +909,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
     <div className="rq-fade">
       <div style={S.parentGreeting}>
         <div style={S.parentGreetDate}>{dayName} · {dateStr}</div>
-        <div style={S.parentGreetH}>Hey, {family.name || 'parent'} 👋</div>
+        <div style={S.parentGreetH}>How's she doing.</div>
         <div style={S.parentGreetSub}>{greetSub}</div>
       </div>
 
@@ -923,16 +933,16 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
 
       {pending.length > 0 && (
         <button onClick={() => setTab('approvals')}
-          style={{ ...S.shortcutBright, marginBottom: 14, borderColor: 'var(--coral)' }}
+          style={{ ...S.shortcutBright, marginBottom: 14, borderColor: 'var(--gum)' }}
           className="rq-press">
-          <div style={{ ...S.shortcutBrightIcon, background: 'var(--coral)' }}>
+          <div style={{ ...S.shortcutBrightIcon, background: 'var(--gum)' }}>
             <Clock size={22} style={{ color: '#fff' }} />
           </div>
           <div style={{ flex: 1, textAlign: 'left' }}>
             <div style={S.shortcutTitle}>{pending.length} waiting for your approval</div>
             <div style={S.shortcutSub}>Tap to review proof and confirm</div>
           </div>
-          <ChevronRight size={20} style={{ color: 'var(--coral)' }} />
+          <ChevronRight size={20} style={{ color: 'var(--gum)' }} />
         </button>
       )}
 
@@ -977,7 +987,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
       {latestVideo && (
         <>
           <div style={S.blockTitle}>
-            <Film size={16} style={{ color: 'var(--berry)' }} />
+            <Film size={16} style={{ color: 'var(--gum)' }} />
             Her latest reflection
           </div>
           <a href={latestVideo.media_url} target="_blank" rel="noreferrer" style={S.latestVideoCard}>
@@ -989,7 +999,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
                 {new Date(latestVideo.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
               </div>
             </div>
-            <Play size={22} style={{ color: 'var(--berry)' }} />
+            <Play size={22} style={{ color: 'var(--gum)' }} />
           </a>
         </>
       )}
@@ -997,7 +1007,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
       {recentClaims.length > 0 && (
         <>
           <div style={S.blockTitle}>
-            <Sparkles size={16} style={{ color: 'var(--coral)' }} />
+            <Sparkles size={16} style={{ color: 'var(--gum)' }} />
             Lately
           </div>
           {recentClaims.map((c) => (
@@ -1043,7 +1053,7 @@ function ParentApprovals({ pending, onApprove, onDecline }) {
         </div>
         {d.media_url && (
           <a href={d.media_url} target="_blank" rel="noreferrer"
-            style={{ fontSize: 11, color: 'var(--coral)', fontWeight: 800, textDecoration: 'none' }}>
+            style={{ fontSize: 11, color: 'var(--gum)', fontWeight: 800, textDecoration: 'none' }}>
             Open full
           </a>
         )}
@@ -1064,14 +1074,14 @@ function ParentApprovals({ pending, onApprove, onDecline }) {
       <h2 style={S.h2}>Approvals</h2>
       {pending.length === 0 && (
         <div style={S.emptyBox}>
-          <CheckCircle2 size={26} style={{ color: 'var(--mint)' }} />
+          <CheckCircle2 size={26} style={{ color: 'var(--slime)' }} />
           <span>Nothing waiting — all caught up.</span>
         </div>
       )}
       {chores.length > 0 && (
         <>
           <div style={S.sectionTag}>
-            <Circle size={13} style={{ color: 'var(--mint)' }} />
+            <Circle size={13} style={{ color: 'var(--slime)' }} />
             Daily tasks ({chores.length})
           </div>
           {chores.map(Card)}
@@ -1113,7 +1123,7 @@ function ParentVideos({ videos }) {
                 {new Date(v.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
             </div>
-            <Play size={18} style={{ color: 'var(--coral)' }} />
+            <Play size={18} style={{ color: 'var(--gum)' }} />
           </a>
         ))
       )}
@@ -1139,7 +1149,7 @@ function ParentRewards({ redemptions, onFulfill }) {
       {unfilled.length > 0 && (
         <>
           <div style={S.sectionTag}>
-            <Clock size={13} style={{ color: 'var(--coral)' }} />
+            <Clock size={13} style={{ color: 'var(--gum)' }} />
             To give ({unfilled.length})
           </div>
           {unfilled.map((r) => (
@@ -1177,7 +1187,7 @@ function ParentEdit({ tasks, decisions, rewards, familyId, flash, reload }) {
     <div className="rq-fade">
       <h2 style={S.h2}>Edit lists</h2>
       <ListEditor title="Daily tasks" hint="Small-point everyday chores."
-        color="var(--mint)" items={tasks} table="tasks"
+        color="var(--slime)" items={tasks} table="tasks"
         familyId={familyId} defaultPts={5} flash={flash} reload={reload} />
       <ListEditor title="Smart choices" hint="Big-point good decisions."
         color="var(--gold)" items={decisions} table="decisions"
@@ -1287,7 +1297,7 @@ function RewardEditor({ rewards, familyId, flash, reload }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={S.sectionTag}>
-        <Gift size={13} style={{ color: 'var(--coral)' }} />
+        <Gift size={13} style={{ color: 'var(--gum)' }} />
         Rewards
       </div>
       <p style={S.sectionHint}>
@@ -1406,7 +1416,7 @@ function KidMe({ family, onSave }) {
       <p style={S.sectionHint}>Pick your avatar and color theme. Changes save when you tap Save.</p>
 
       <div style={S.sectionTag}>
-        <Sparkles size={13} style={{ color: 'var(--coral)' }} />
+        <Sparkles size={13} style={{ color: 'var(--gum)' }} />
         Your avatar
       </div>
       <div style={{ ...S.personalizeRow, marginTop: 8 }}>
