@@ -38,6 +38,13 @@ body, button, input, select, textarea {
   50%     { opacity: 0.55; transform: scale(1.25); }
 }
 
+/* nav badge pulse — gently nudges attention to the pending count */
+.rq-badge-pulse { animation: rqBadgePulse 2.4s ease-in-out infinite; }
+@keyframes rqBadgePulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(233,30,99,.45); }
+  50%     { box-shadow: 0 0 0 6px rgba(233,30,99,0); }
+}
+
 /* gentle marquee */
 .rq-marquee {
   display: flex; gap: 36px; white-space: nowrap;
@@ -801,6 +808,42 @@ export const S = {
     display: "inline-flex", alignItems: "center", gap: 4,
     fontSize: 10.5, color: "var(--accent)", fontWeight: 700, letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+
+  /* ===== pending hero banner — parent dashboard ===== */
+  pendingHero: {
+    width: "100%", display: "flex", alignItems: "center", gap: 16,
+    background: "var(--accent)",
+    border: "none", borderRadius: 8, padding: "18px 20px",
+    marginBottom: 18, color: "#fff", cursor: "pointer",
+    boxShadow: "0 12px 32px rgba(233,30,99,.3)",
+    position: "relative", overflow: "hidden",
+  },
+  pendingHeroLeft: {
+    display: "flex", flexDirection: "column", alignItems: "center",
+    justifyContent: "center", flexShrink: 0,
+    paddingRight: 16, borderRight: "1px solid rgba(255,255,255,.25)",
+    minWidth: 56,
+  },
+  pendingHeroCount: {
+    fontFamily: "'Fraunces', serif", fontWeight: 400,
+    fontSize: 44, lineHeight: 0.95, letterSpacing: "-0.04em", color: "#fff",
+    fontVariationSettings: "'opsz' 144",
+  },
+  pendingHeroKicker: {
+    fontSize: 9.5, fontWeight: 700, letterSpacing: 1.6,
+    textTransform: "uppercase", color: "rgba(255,255,255,.8)",
+    marginTop: 2,
+  },
+  pendingHeroTitle: {
+    fontFamily: "'Fraunces', serif", fontWeight: 400, fontSize: 22,
+    color: "#fff", letterSpacing: "-0.03em", lineHeight: 1.05,
+    fontVariationSettings: "'opsz' 100",
+  },
+  pendingHeroItalic: { fontStyle: "italic" },
+  pendingHeroSub: {
+    fontSize: 12, color: "rgba(255,255,255,.85)", fontWeight: 500,
+    marginTop: 4, letterSpacing: 0.2,
   },
 
   /* ===== proof action sheet ===== */

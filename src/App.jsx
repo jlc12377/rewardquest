@@ -868,6 +868,14 @@ function ParentApp({ familyId, user }) {
     reload()
   }
 
+  /* Update browser/PWA tab title to reflect pending count — like Gmail does.
+     When the app is in the iOS app switcher, this shows "(3) reward·quest". */
+  useEffect(() => {
+    const base = 'reward·quest'
+    document.title = pending.length > 0 ? `(${pending.length}) ${base}` : base
+    return () => { document.title = base }
+  }, [pending.length])
+
   if (!family) return <Splash msg="Loading dashboard…" />
 
   const theme = themeById(family.theme)
@@ -892,7 +900,7 @@ function ParentApp({ familyId, user }) {
             style={{ ...S.modeBtn, ...(tab === 'approvals' ? S.modeActive : {}) }}
             className="rq-press">
             Approvals
-            {pending.length > 0 && <span style={S.navBadge}>{pending.length}</span>}
+            {pending.length > 0 && <span style={S.navBadge} className="rq-badge-pulse">{pending.length}</span>}
           </button>
           <button onClick={() => setTab('videos')}
             style={{ ...S.modeBtn, ...(tab === 'videos' ? S.modeActive : {}) }}
@@ -1007,16 +1015,21 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
 
       {pending.length > 0 && (
         <button onClick={() => setTab('approvals')}
-          style={{ ...S.shortcutBright, marginBottom: 14, borderColor: 'var(--accent)' }}
+          style={S.pendingHero}
           className="rq-press">
-          <div style={{ ...S.shortcutBrightIcon, background: 'var(--accent)' }}>
-            <Clock size={22} style={{ color: '#fff' }} />
+          <div style={S.pendingHeroLeft}>
+            <div style={S.pendingHeroCount}>{pending.length}</div>
+            <div style={S.pendingHeroKicker}>
+              {pending.length === 1 ? 'item' : 'items'}
+            </div>
           </div>
           <div style={{ flex: 1, textAlign: 'left' }}>
-            <div style={S.shortcutTitle}>{pending.length} waiting for your approval</div>
-            <div style={S.shortcutSub}>Tap to review proof and confirm</div>
+            <div style={S.pendingHeroTitle}>
+              Waiting on <span style={S.pendingHeroItalic}>you.</span>
+            </div>
+            <div style={S.pendingHeroSub}>Tap to review proof and approve</div>
           </div>
-          <ChevronRight size={20} style={{ color: 'var(--accent)' }} />
+          <ChevronRight size={22} style={{ color: '#fff' }} />
         </button>
       )}
 
