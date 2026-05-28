@@ -16,7 +16,7 @@ import {
 import { supabase } from './supabase.js'
 import {
   CSS, S, TIERS, TIER_COLORS, EMOJI_CHOICES, VIDEO_PROMPTS, VIDEO_PTS, todayKey,
-  AVATAR_CHOICES, THEMES, evaluateBadges, todayLine,
+  AVATAR_CHOICES, AVATAR_CATEGORIES, THEMES, evaluateBadges, todayLine,
 } from './styles.js'
 
 /* ============================================================
@@ -764,7 +764,7 @@ function KidStore({ family, rewards, onRedeem }) {
                   <button onClick={() => onRedeem(r)} disabled={!afford}
                     style={{ ...S.redeemBtn, ...(afford ? {} : S.redeemLocked) }}
                     className="rq-press">
-                    {afford ? 'Redeem' : <Lock size={14} />}
+                    {afford ? <span style={{ color: '#fff' }}>Redeem</span> : <Lock size={14} />}
                   </button>
                 </div>
               )
@@ -1521,8 +1521,12 @@ function BadgePop({ badge }) {
 function KidMe({ family, onSave }) {
   const [avatar, setAvatar] = useState(family.avatar_emoji || AVATAR_CHOICES[0])
   const [theme, setTheme] = useState(family.theme || THEMES[0].id)
+  // Default to the category that contains the current avatar (so they don't have to re-find it)
+  const findCat = (e) => AVATAR_CATEGORIES.find(c => c.items.includes(e))?.id || AVATAR_CATEGORIES[0].id
+  const [cat, setCat] = useState(findCat(avatar))
 
   const save = () => onSave({ avatar, theme })
+  const currentCat = AVATAR_CATEGORIES.find(c => c.id === cat) || AVATAR_CATEGORIES[0]
 
   return (
     <div className="rq-fade">
@@ -1530,19 +1534,30 @@ function KidMe({ family, onSave }) {
       <p style={S.sectionHint}>Pick your avatar and color theme. Changes save when you tap Save.</p>
 
       <div style={S.sectionTag}>
-        <Sparkles size={13} style={{ color: 'var(--gum)' }} />
+        <Sparkles size={13} style={{ color: 'var(--accent)' }} />
         Your avatar
       </div>
-      <div style={{ ...S.personalizeRow, marginTop: 8 }}>
-        {AVATAR_CHOICES.map((e) => (
+
+      <div style={S.catRow}>
+        {AVATAR_CATEGORIES.map((c) => (
+          <button key={c.id} onClick={() => setCat(c.id)}
+            style={{ ...S.catBtn, ...(cat === c.id ? S.catBtnActive : {}) }}
+            aria-label={c.label} title={c.label}>
+            {c.icon}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ ...S.personalizeRow, marginTop: 4 }}>
+        {currentCat.items.map((e) => (
           <button key={e} onClick={() => setAvatar(e)}
             style={{ ...S.personalizeBtn, ...(avatar === e ? S.personalizeActive : {}) }}
             className="rq-press">{e}</button>
         ))}
       </div>
 
-      <div style={{ ...S.sectionTag, marginTop: 18 }}>
-        <Palette size={13} style={{ color: 'var(--gold)' }} />
+      <div style={{ ...S.sectionTag, marginTop: 22 }}>
+        <Palette size={13} style={{ color: 'var(--accent)' }} />
         Color theme
       </div>
       <div style={{ ...S.personalizeRow, gridTemplateColumns: 'repeat(6, 1fr)', marginTop: 8 }}>
