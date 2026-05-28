@@ -748,9 +748,9 @@ export const S = {
 
   /* ===== avatar / personalize ===== */
   avatarChip: {
-    width: 38, height: 38, borderRadius: 999,
+    width: 40, height: 40, borderRadius: 999,
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: 19, flexShrink: 0, marginRight: 12,
+    fontSize: 20, flexShrink: 0,
     background: "var(--shelf)", border: "1px solid var(--hair)",
   },
   personalizeRow: {
@@ -783,10 +783,14 @@ export const S = {
     boxShadow: "0 1px 3px rgba(10,10,10,.08)",
   },
   themeSwatch: {
-    aspectRatio: "1 / 1", borderRadius: 4,
+    aspectRatio: "1 / 1", borderRadius: 12,
     cursor: "pointer", border: "1px solid var(--hair)",
+    transition: "transform .15s ease, box-shadow .15s ease",
   },
-  themeSwatchActive: { boxShadow: "inset 0 0 0 2px var(--ink)" },
+  themeSwatchActive: {
+    boxShadow: "inset 0 0 0 3px var(--paper), inset 0 0 0 5px var(--ink)",
+    transform: "scale(1.04)",
+  },
 
   miniBadge: {
     display: "inline-flex", alignItems: "center", gap: 5,
@@ -920,14 +924,22 @@ export const AVATAR_CATEGORIES = [
 // Flat list (kept for backward compatibility / random selection)
 export const AVATAR_CHOICES = AVATAR_CATEGORIES.flatMap(c => c.items)
 
+/* Accent color themes — each defines the signature pop color.
+   The editorial base (black/white/cream) is fixed; only the accent moves.
+   IDs are stable so they save to the DB without future migration churn. */
 export const THEMES = [
-  { id: "signature", label: "Signature", gold: "#E91E63", goldDark: "#B71C4A", lav: "#0A0A0A", lavDark: "#0A0A0A" },
-  { id: "rose",      label: "Rose",      gold: "#F06292", goldDark: "#C2185B", lav: "#0A0A0A", lavDark: "#0A0A0A" },
-  { id: "amber",     label: "Amber",     gold: "#FF9F1C", goldDark: "#E68A00", lav: "#0A0A0A", lavDark: "#0A0A0A" },
-  { id: "ink",       label: "Ink",       gold: "#0A0A0A", goldDark: "#000000", lav: "#0A0A0A", lavDark: "#000000" },
-  { id: "petal",     label: "Petal",     gold: "#FFB5C2", goldDark: "#E89AAA", lav: "#0A0A0A", lavDark: "#0A0A0A" },
-  { id: "sage",      label: "Sage",      gold: "#7B9B7E", goldDark: "#5F7E62", lav: "#0A0A0A", lavDark: "#0A0A0A" },
+  { id: "magenta", label: "Magenta", accent: "#E91E63", accentSoft: "#FCE4EC", accentDark: "#B71C4A" },
+  { id: "violet",  label: "Violet",  accent: "#7C3AED", accentSoft: "#EDE9FE", accentDark: "#5B21B6" },
+  { id: "cobalt",  label: "Cobalt",  accent: "#1E64E9", accentSoft: "#DBEAFE", accentDark: "#1E40AF" },
+  { id: "teal",    label: "Teal",    accent: "#06B6D4", accentSoft: "#CFFAFE", accentDark: "#0E7490" },
+  { id: "lime",    label: "Lime",    accent: "#84CC16", accentSoft: "#ECFCCB", accentDark: "#4D7C0F" },
+  { id: "ink",     label: "Ink",     accent: "#0A0A0A", accentSoft: "#F2EFEA", accentDark: "#000000" },
 ]
+
+/* Helper to find a theme by id, with safe fallback to magenta */
+export function themeById(id) {
+  return THEMES.find(t => t.id === id) || THEMES[0]
+}
 
 export function evaluateBadges({ family, claimsCount, videosCount, redemptionsCount, choreApprovedCount }) {
   const lifetime = family.lifetime_points || 0
