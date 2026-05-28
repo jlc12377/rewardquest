@@ -825,28 +825,28 @@ function ParentApp({ familyId, user }) {
           <button onClick={() => setTab('home')}
             style={{ ...S.modeBtn, ...(tab === 'home' ? S.modeActive : {}) }}
             className="rq-press">
-            <Trophy size={14} /> Home
+            Home
           </button>
           <button onClick={() => setTab('approvals')}
             style={{ ...S.modeBtn, ...(tab === 'approvals' ? S.modeActive : {}) }}
             className="rq-press">
-            <CheckCircle2 size={14} /> Approvals
+            Approvals
             {pending.length > 0 && <span style={S.navBadge}>{pending.length}</span>}
           </button>
           <button onClick={() => setTab('videos')}
             style={{ ...S.modeBtn, ...(tab === 'videos' ? S.modeActive : {}) }}
             className="rq-press">
-            <Film size={14} /> Videos
+            Videos
           </button>
           <button onClick={() => setTab('rewards')}
             style={{ ...S.modeBtn, ...(tab === 'rewards' ? S.modeActive : {}) }}
             className="rq-press">
-            <Gift size={14} /> Rewards
+            Rewards
           </button>
           <button onClick={() => setTab('edit')}
             style={{ ...S.modeBtn, ...(tab === 'edit' ? S.modeActive : {}) }}
             className="rq-press">
-            <Pencil size={14} /> Edit
+            Edit
           </button>
         </div>
 

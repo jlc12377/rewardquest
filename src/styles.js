@@ -640,9 +640,9 @@ export const S = {
   modeBtn: {
     flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
     background: "transparent", border: "none",
-    padding: "12px 6px", fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: 11,
-    color: "var(--mute)", letterSpacing: 1.4, textTransform: "uppercase",
-    position: "relative",
+    padding: "12px 4px", fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: 10.5,
+    color: "var(--mute)", letterSpacing: 0.8, textTransform: "uppercase",
+    position: "relative", minWidth: 0,
   },
   modeActive: {
     color: "var(--ink)", fontWeight: 700,
