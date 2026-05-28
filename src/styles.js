@@ -818,8 +818,20 @@ export const S = {
 export const TIERS = ["Small", "Medium", "Large"]
 export const TIER_COLORS = { Small: "#0A0A0A", Medium: "#0A0A0A", Large: "#E91E63" }
 export const EMOJI_CHOICES = [
-  "💄","💅","🌸","💎","👛","🎀","💍","👜","🕶️","💖","🎧","🎮",
-  "📚","🎨","🍕","🍦","🎬","💳","🎡","🛍️","⭐","🧸","🛹","🎁","✨"
+  // Money & gift cards
+  "💵","💰","💸","💳","🪙",
+  // Food & treats
+  "☕","🍦","🍿","🍕","🍩","🧋","🥨","🍓",
+  // Shopping & beauty
+  "🛒","🛍️","👛","👜","🕶️","💄","💅","🌸","💎","💍","🎀",
+  // Experiences
+  "🎬","🎡","🎢","🎯","🎤","🎮","📚","🎨",
+  // Travel & sleepovers
+  "✈️","🏖️","🏕️","🛏️","🧳",
+  // Active
+  "🏊","⛷️","🚴","🛹","🤸","🏐","⚽",
+  // Special
+  "⭐","✨","🎁","🪐","💖","🧸",
 ]
 export const VIDEO_PROMPTS = [
   "Heyyy — tell us about a good choice you made today and why.",
