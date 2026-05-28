@@ -176,21 +176,59 @@ function AuthScreen() {
    Shared bits: proof picker, thumbnail, header
    ============================================================ */
 function ProofInput({ onPicked, children, style, className, busy }) {
-  const ref = useRef(null)
+  const cameraRef = useRef(null)
+  const libraryRef = useRef(null)
+  const [open, setOpen] = useState(false)
+
   const handle = (e) => {
     const file = e.target.files && e.target.files[0]
+    e.target.value = ''
+    setOpen(false)
     if (!file) return
     onPicked(file)
-    e.target.value = ''
   }
+
   return (
     <>
-      <input ref={ref} type="file" accept="image/*,video/*" capture="user"
+      {/* Camera: rear camera, photo or video. The `capture` attr tells the phone
+          to open the camera directly instead of the file browser. */}
+      <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment"
         onChange={handle} style={{ display: 'none' }} />
-      <button onClick={() => !busy && ref.current && ref.current.click()}
+      {/* Library: no capture attr → opens photo library / camera roll. */}
+      <input ref={libraryRef} type="file" accept="image/*,video/*"
+        onChange={handle} style={{ display: 'none' }} />
+
+      <button onClick={() => !busy && setOpen(true)}
         style={style} className={className} disabled={busy}>
         {children}
       </button>
+
+      {open && (
+        <div style={S.sheetBackdrop} onClick={() => setOpen(false)}>
+          <div style={S.sheet} onClick={(e) => e.stopPropagation()} className="rq-fade">
+            <div style={S.sheetTitle}>Add your proof</div>
+            <button style={S.sheetBtn} className="rq-press"
+              onClick={() => cameraRef.current && cameraRef.current.click()}>
+              <Camera size={22} style={{ color: 'var(--accent)' }} />
+              <div style={{ textAlign: 'left' }}>
+                <div style={S.sheetBtnTitle}>Take a photo or video</div>
+                <div style={S.sheetBtnSub}>Open the camera now</div>
+              </div>
+            </button>
+            <button style={S.sheetBtn} className="rq-press"
+              onClick={() => libraryRef.current && libraryRef.current.click()}>
+              <ImageIcon size={22} style={{ color: 'var(--accent)' }} />
+              <div style={{ textAlign: 'left' }}>
+                <div style={S.sheetBtnTitle}>Choose from photos</div>
+                <div style={S.sheetBtnSub}>Pick something you already have</div>
+              </div>
+            </button>
+            <button style={S.sheetCancel} className="rq-press" onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </>
   )
 }

@@ -781,6 +781,39 @@ export const S = {
     textTransform: "uppercase",
   },
 
+  /* ===== proof action sheet ===== */
+  sheetBackdrop: {
+    position: "fixed", inset: 0, background: "rgba(10,10,10,.5)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    zIndex: 120, display: "flex", alignItems: "flex-end",
+    padding: "0 12px calc(12px + env(safe-area-inset-bottom))",
+  },
+  sheet: {
+    width: "100%", maxWidth: 456, margin: "0 auto",
+    background: "var(--paper)", borderRadius: 16, padding: 12,
+    boxShadow: "0 -10px 60px rgba(0,0,0,.25)",
+  },
+  sheetTitle: {
+    fontFamily: "'Inter', sans-serif", fontSize: 10.5, fontWeight: 600,
+    color: "var(--mute)", textTransform: "uppercase", letterSpacing: 2,
+    textAlign: "center", padding: "8px 0 12px",
+  },
+  sheetBtn: {
+    width: "100%", display: "flex", alignItems: "center", gap: 14,
+    background: "var(--shelf)", border: "none", borderRadius: 10,
+    padding: "16px 18px", marginBottom: 8, cursor: "pointer",
+  },
+  sheetBtnTitle: {
+    fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 500,
+    color: "var(--ink)", letterSpacing: "-0.02em",
+  },
+  sheetBtnSub: { fontSize: 12, color: "var(--mute)", fontWeight: 500, marginTop: 2 },
+  sheetCancel: {
+    width: "100%", background: "transparent", border: "none",
+    padding: "16px", fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600,
+    color: "var(--mute)", letterSpacing: 0.4, textTransform: "uppercase", cursor: "pointer",
+  },
+
   /* toast */
   toast: {
     position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
