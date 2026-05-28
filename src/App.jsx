@@ -16,7 +16,7 @@ import {
 import { supabase } from './supabase.js'
 import {
   CSS, S, TIERS, TIER_COLORS, EMOJI_CHOICES, VIDEO_PROMPTS, VIDEO_PTS, todayKey,
-  AVATAR_CHOICES, AVATAR_CATEGORIES, THEMES, evaluateBadges, todayLine,
+  AVATAR_CHOICES, AVATAR_CATEGORIES, THEMES, themeById, evaluateBadges, todayLine,
 } from './styles.js'
 
 /* ============================================================
@@ -245,11 +245,11 @@ function AppHeader({ family, role, onSignOut }) {
     <header style={S.header}>
       <div>
         <div style={S.brand}>
-          <Sparkles size={20} style={{ color: 'var(--gold)' }} />
+          <Sparkles size={20} style={{ color: 'var(--accent)' }} />
           <span style={S.brandWord}>RewardQuest</span>
         </div>
         <div style={S.whoami}>
-          <Heart size={12} style={{ color: 'var(--gum)' }} />
+          <Heart size={12} style={{ color: 'var(--accent)' }} />
           {role === 'parent' ? 'Parent dashboard' : `${family.streak || 1} day${(family.streak || 1) !== 1 ? 's' : ''} in a row — keep glowing`}
         </div>
       </div>
@@ -385,12 +385,13 @@ function KidApp({ familyId, user }) {
 
   if (!family) return <Splash msg="Loading your quest…" />
 
-  /* apply theme + base palette */
-  const theme = THEMES.find(t => t.id === family.theme) || THEMES[0]
+  /* apply theme accent override */
+  const theme = themeById(family.theme)
   const themedApp = {
     ...S.app,
-    "--gold": theme.gold,
-    "--lav": theme.lav,
+    "--accent": theme.accent,
+    "--accentSoft": theme.accentSoft,
+    "--accentDark": theme.accentDark,
   }
 
   return (
@@ -405,7 +406,7 @@ function KidApp({ familyId, user }) {
           <KidTasks family={family} tasks={tasks} decisions={decisions}
             pending={pending} onSubmit={onSubmitClaim} />
         )}
-        {tab === 'video' && <KidVideo onSave={onSaveVideo} videos={videos} />}
+        {tab === 'video' && <KidVideo onSave={onSaveVideo} videos={videos} family={family} />}
         {tab === 'store' && <KidStore family={family} rewards={rewards} onRedeem={onRedeem} />}
         {tab === 'me'    && <KidMe family={family} onSave={onSavePersonalize} />}
       </main>
@@ -428,14 +429,18 @@ function KidApp({ familyId, user }) {
 /* kid header — wordmark, soft subtitle, points number */
 function KidHeader({ family, pointsBump }) {
   const streak = family.streak || 1
+  const avatar = family.avatar_emoji || '✨'
   return (
     <header style={S.header}>
-      <div>
-        <div style={S.brand}>
-          <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
-        </div>
-        <div style={S.whoami}>
-          <span style={S.miniStreakChip}>{streak}-day streak</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={S.avatarChip}>{avatar}</div>
+        <div>
+          <div style={S.brand}>
+            <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
+          </div>
+          <div style={S.whoami}>
+            <span style={S.miniStreakChip}>{streak}-day streak</span>
+          </div>
         </div>
       </div>
       <div style={S.pointsBadge}>
@@ -624,7 +629,7 @@ function KidTasks({ family, tasks, decisions, pending, onSubmit }) {
       })}
 
       <div style={{ ...S.sectionTag, marginTop: 26 }}>
-        <Star size={13} style={{ color: 'var(--gold)' }} />
+        <Star size={13} style={{ color: 'var(--accent)' }} />
         Smart choices · big points
       </div>
       <p style={S.sectionHint}>
@@ -645,7 +650,7 @@ function KidTasks({ family, tasks, decisions, pending, onSubmit }) {
               <span style={S.decisionPts}>+{d.points}</span>
             ) : (
               <ProofInput onPicked={(file) => onSubmit('choice', d, file)}
-                style={{ ...S.proofBtn, background: 'var(--gold)', boxShadow: '0 3px 0 #E0A93F' }}
+                style={{ ...S.proofBtn, background: 'var(--accent)', boxShadow: '0 3px 0 #E0A93F' }}
                 className="rq-press">
                 <Camera size={14} /> +{d.points}
               </ProofInput>
@@ -657,7 +662,7 @@ function KidTasks({ family, tasks, decisions, pending, onSubmit }) {
   )
 }
 
-function KidVideo({ onSave, videos }) {
+function KidVideo({ onSave, videos, family }) {
   const [prompt, setPrompt] = useState(VIDEO_PROMPTS[0])
   const [pendingFile, setPendingFile] = useState(null)
   const [pendingUrl, setPendingUrl] = useState(null)
@@ -727,7 +732,8 @@ function KidVideo({ onSave, videos }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={S.videoLogPrompt}>{v.prompt}</div>
                 <div style={S.videoLogDate}>
-                  {new Date(v.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  <span style={{ marginRight: 6 }}>by {family?.avatar_emoji || '✨'}</span>
+                  · {new Date(v.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </div>
               </div>
             </div>
@@ -864,8 +870,13 @@ function ParentApp({ familyId, user }) {
 
   if (!family) return <Splash msg="Loading dashboard…" />
 
-  const theme = THEMES.find(t => t.id === family.theme) || THEMES[0]
-  const themedApp = { ...S.app, "--gold": theme.gold, "--lav": theme.lav }
+  const theme = themeById(family.theme)
+  const themedApp = {
+    ...S.app,
+    "--accent": theme.accent,
+    "--accentSoft": theme.accentSoft,
+    "--accentDark": theme.accentDark,
+  }
 
   return (
     <div style={themedApp}>
@@ -908,7 +919,7 @@ function ParentApp({ familyId, user }) {
         {tab === 'approvals' && (
           <ParentApprovals pending={pending} onApprove={onApprove} onDecline={onDecline} />
         )}
-        {tab === 'videos' && <ParentVideos videos={videos} />}
+        {tab === 'videos' && <ParentVideos videos={videos} family={family} />}
         {tab === 'rewards' && (
           <ParentRewards redemptions={redemptions} onFulfill={onFulfill} />
         )}
@@ -932,14 +943,18 @@ function ParentApp({ familyId, user }) {
 
 /* parent-view header */
 function ParentHeader({ family, pointsBump }) {
+  const avatar = family.avatar_emoji || '✨'
   return (
     <header style={S.header}>
-      <div>
-        <div style={S.brand}>
-          <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
-        </div>
-        <div style={S.whoami}>
-          <span>Parent</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={S.avatarChip}>{avatar}</div>
+        <div>
+          <div style={S.brand}>
+            <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
+          </div>
+          <div style={S.whoami}>
+            <span>Parent</span>
+          </div>
         </div>
       </div>
       <div style={S.pointsBadge}>
@@ -992,38 +1007,38 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
 
       {pending.length > 0 && (
         <button onClick={() => setTab('approvals')}
-          style={{ ...S.shortcutBright, marginBottom: 14, borderColor: 'var(--gum)' }}
+          style={{ ...S.shortcutBright, marginBottom: 14, borderColor: 'var(--accent)' }}
           className="rq-press">
-          <div style={{ ...S.shortcutBrightIcon, background: 'var(--gum)' }}>
+          <div style={{ ...S.shortcutBrightIcon, background: 'var(--accent)' }}>
             <Clock size={22} style={{ color: '#fff' }} />
           </div>
           <div style={{ flex: 1, textAlign: 'left' }}>
             <div style={S.shortcutTitle}>{pending.length} waiting for your approval</div>
             <div style={S.shortcutSub}>Tap to review proof and confirm</div>
           </div>
-          <ChevronRight size={20} style={{ color: 'var(--gum)' }} />
+          <ChevronRight size={20} style={{ color: 'var(--accent)' }} />
         </button>
       )}
 
       {unfilledRedemptions > 0 && (
         <button onClick={() => setTab('rewards')}
-          style={{ ...S.shortcutBright, marginBottom: 14, borderColor: 'var(--gold)' }}
+          style={{ ...S.shortcutBright, marginBottom: 14, borderColor: 'var(--accent)' }}
           className="rq-press">
-          <div style={{ ...S.shortcutBrightIcon, background: 'var(--gold)' }}>
+          <div style={{ ...S.shortcutBrightIcon, background: 'var(--accent)' }}>
             <Gift size={22} style={{ color: '#fff' }} />
           </div>
           <div style={{ flex: 1, textAlign: 'left' }}>
             <div style={S.shortcutTitle}>{unfilledRedemptions} reward{unfilledRedemptions !== 1 ? 's' : ''} to give</div>
             <div style={S.shortcutSub}>She redeemed — don't forget to deliver</div>
           </div>
-          <ChevronRight size={20} style={{ color: 'var(--gold)' }} />
+          <ChevronRight size={20} style={{ color: 'var(--accent)' }} />
         </button>
       )}
 
       {nextReward && (
         <>
           <div style={S.blockTitle}>
-            <Star size={16} style={{ color: 'var(--gold)' }} />
+            <Star size={16} style={{ color: 'var(--accent)' }} />
             She's working toward
           </div>
           <div style={S.rewardProgressCard}>
@@ -1046,7 +1061,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
       {latestVideo && (
         <>
           <div style={S.blockTitle}>
-            <Film size={16} style={{ color: 'var(--gum)' }} />
+            <Film size={16} style={{ color: 'var(--accent)' }} />
             Her latest reflection
           </div>
           <a href={latestVideo.media_url} target="_blank" rel="noreferrer" style={S.latestVideoCard}>
@@ -1058,7 +1073,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
                 {new Date(latestVideo.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
               </div>
             </div>
-            <Play size={22} style={{ color: 'var(--gum)' }} />
+            <Play size={22} style={{ color: 'var(--accent)' }} />
           </a>
         </>
       )}
@@ -1066,7 +1081,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
       {recentClaims.length > 0 && (
         <>
           <div style={S.blockTitle}>
-            <Sparkles size={16} style={{ color: 'var(--gum)' }} />
+            <Sparkles size={16} style={{ color: 'var(--accent)' }} />
             Lately
           </div>
           {recentClaims.map((c) => (
@@ -1089,7 +1104,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
 
       {recentClaims.length === 0 && pending.length === 0 && (
         <div style={{ ...S.emptyBox, marginTop: 20 }}>
-          <Sparkles size={26} style={{ color: 'var(--gold)' }} />
+          <Sparkles size={26} style={{ color: 'var(--accent)' }} />
           <span>Once she starts logging, you'll see her progress here.</span>
         </div>
       )}
@@ -1112,7 +1127,7 @@ function ParentApprovals({ pending, onApprove, onDecline }) {
         </div>
         {d.media_url && (
           <a href={d.media_url} target="_blank" rel="noreferrer"
-            style={{ fontSize: 11, color: 'var(--gum)', fontWeight: 800, textDecoration: 'none' }}>
+            style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 800, textDecoration: 'none' }}>
             Open full
           </a>
         )}
@@ -1149,7 +1164,7 @@ function ParentApprovals({ pending, onApprove, onDecline }) {
       {choices.length > 0 && (
         <>
           <div style={{ ...S.sectionTag, marginTop: 18 }}>
-            <Star size={13} style={{ color: 'var(--gold)' }} />
+            <Star size={13} style={{ color: 'var(--accent)' }} />
             Smart choices &amp; videos ({choices.length})
           </div>
           {choices.map(Card)}
@@ -1159,7 +1174,7 @@ function ParentApprovals({ pending, onApprove, onDecline }) {
   )
 }
 
-function ParentVideos({ videos }) {
+function ParentVideos({ videos, family }) {
   return (
     <div className="rq-fade">
       <h2 style={S.h2}>Video archive</h2>
@@ -1168,7 +1183,7 @@ function ParentVideos({ videos }) {
       </p>
       {videos.length === 0 ? (
         <div style={S.emptyBox}>
-          <Film size={26} style={{ color: 'var(--lav)' }} />
+          <Film size={26} style={{ color: 'var(--accent)' }} />
           <span>No videos yet.</span>
         </div>
       ) : (
@@ -1179,10 +1194,11 @@ function ParentVideos({ videos }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ ...S.videoLogPrompt, whiteSpace: 'normal' }}>{v.prompt}</div>
               <div style={S.videoLogDate}>
-                {new Date(v.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                <span style={{ marginRight: 6 }}>by {family?.avatar_emoji || '✨'}</span>
+                · {new Date(v.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
             </div>
-            <Play size={18} style={{ color: 'var(--gum)' }} />
+            <Play size={18} style={{ color: 'var(--accent)' }} />
           </a>
         ))
       )}
@@ -1201,14 +1217,14 @@ function ParentRewards({ redemptions, onFulfill }) {
       </p>
       {unfilled.length === 0 && fulfilled.length === 0 && (
         <div style={S.emptyBox}>
-          <Gift size={26} style={{ color: 'var(--gold)' }} />
+          <Gift size={26} style={{ color: 'var(--accent)' }} />
           <span>No redemptions yet.</span>
         </div>
       )}
       {unfilled.length > 0 && (
         <>
           <div style={S.sectionTag}>
-            <Clock size={13} style={{ color: 'var(--gum)' }} />
+            <Clock size={13} style={{ color: 'var(--accent)' }} />
             To give ({unfilled.length})
           </div>
           {unfilled.map((r) => (
@@ -1250,7 +1266,7 @@ function ParentEdit({ family, tasks, decisions, rewards, familyId, flash, reload
         color="var(--slime)" items={tasks} table="tasks"
         familyId={familyId} defaultPts={5} flash={flash} reload={reload} />
       <ListEditor title="Smart choices" hint="Big-point good decisions."
-        color="var(--gold)" items={decisions} table="decisions"
+        color="var(--accent)" items={decisions} table="decisions"
         familyId={familyId} defaultPts={40} flash={flash} reload={reload} />
       <RewardEditor rewards={rewards} familyId={familyId} flash={flash} reload={reload} />
     </div>
@@ -1411,7 +1427,7 @@ function RewardEditor({ rewards, familyId, flash, reload }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={S.sectionTag}>
-        <Gift size={13} style={{ color: 'var(--gum)' }} />
+        <Gift size={13} style={{ color: 'var(--accent)' }} />
         Rewards
       </div>
       <p style={S.sectionHint}>
@@ -1558,25 +1574,28 @@ function KidMe({ family, onSave }) {
 
       <div style={{ ...S.sectionTag, marginTop: 22 }}>
         <Palette size={13} style={{ color: 'var(--accent)' }} />
-        Color theme
+        Your color
       </div>
       <div style={{ ...S.personalizeRow, gridTemplateColumns: 'repeat(6, 1fr)', marginTop: 8 }}>
         {THEMES.map((t) => (
           <button key={t.id} onClick={() => setTheme(t.id)}
-            title={t.label}
+            title={t.label} aria-label={t.label}
             style={{
               ...S.themeSwatch,
-              background: `linear-gradient(135deg, ${t.gold}, ${t.lav})`,
+              background: t.accent,
               ...(theme === t.id ? S.themeSwatchActive : {}),
             }}
             className="rq-press" />
         ))}
       </div>
-      <p style={S.sectionHint}>
-        {THEMES.find(t => t.id === theme)?.label || 'Pick a vibe'}
+      <p style={{ ...S.sectionHint, marginTop: 8 }}>
+        <em style={{ color: 'var(--accent)', fontFamily: "'Fraunces', serif", fontStyle: 'italic' }}>
+          {themeById(theme).label}
+        </em>
+        {' '}— the signature pop across your app.
       </p>
 
-      <button onClick={save} style={{ ...S.primaryBtn, marginTop: 18 }} className="rq-press">
+      <button onClick={save} style={{ ...S.primaryBtn, marginTop: 22 }} className="rq-press">
         <Check size={18} /> Save
       </button>
     </div>
