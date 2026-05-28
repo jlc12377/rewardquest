@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import {
   signUp, signIn, signOut, getSession,
-  joinOrCreateFamily, getFamily, updateFamily,
+  joinOrCreateFamily, getFamily, updateFamily, ensureInviteCode,
   getTasks, getDecisions, getRewards, addRow, updateRow, deleteRow,
   getPendingClaims, submitClaim, resolveClaim,
   getVideos, addVideo, getRedemptions, addRedemption, markRedemptionFulfilled,
@@ -99,6 +99,7 @@ function AuthScreen() {
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -108,10 +109,14 @@ function AuthScreen() {
     if (!email || !password) { setErr('Enter both email and password'); return }
     if (password.length < 6) { setErr('Password must be at least 6 characters'); return }
     setBusy(true)
-    const fn = mode === 'signup' ? signUp : signIn
-    const { error } = await fn(email.trim(), password)
+    let result
+    if (mode === 'signup') {
+      result = await signUp(email.trim(), password, inviteCode.trim() || null)
+    } else {
+      result = await signIn(email.trim(), password)
+    }
     setBusy(false)
-    if (error) setErr(error.message || 'Something went wrong')
+    if (result.error) setErr(result.error.message || 'Something went wrong')
   }
 
   return (
@@ -128,7 +133,7 @@ function AuthScreen() {
         </h1>
         <p style={S.authSub}>
           {mode === 'signup'
-            ? "The first account in a family becomes the parent. Add the kid's account next."
+            ? "Joining as a kid? Enter your family code below. Otherwise leave it blank to start a new family."
             : 'Sign in to your family.'}
         </p>
 
@@ -139,6 +144,12 @@ function AuthScreen() {
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             placeholder="Password" value={password}
             onChange={(e) => setPassword(e.target.value)} />
+          {mode === 'signup' && (
+            <input style={S.authInput} type="text"
+              placeholder="Family code (optional)" value={inviteCode}
+              autoCapitalize="characters"
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
+          )}
           {err && <div style={{ ...S.authErr, marginTop: 16 }}>{err}</div>}
           <button type="submit" style={{ ...S.primaryBtn, marginTop: 28 }} className="rq-press" disabled={busy}>
             {busy ? '…' : (mode === 'signup' ? 'Create account' : 'Sign in')}
@@ -152,7 +163,8 @@ function AuthScreen() {
 
         {mode === 'signup' && (
           <div style={S.authInfo}>
-            The first account in a family becomes the parent. Add the kid&rsquo;s account next on her phone. Both share the same family data.
+            <strong>Parent:</strong> leave the family code blank. After signing in, you&rsquo;ll see a code to give your kid.<br/>
+            <strong>Kid:</strong> enter the family code your parent gives you (looks like <em>RQ-XXXX</em>).
           </div>
         )}
       </div>
@@ -864,6 +876,7 @@ function ParentApp({ familyId, user }) {
         )}
         {tab === 'edit' && (
           <ParentEdit
+            family={family}
             tasks={tasks} decisions={decisions} rewards={rewards}
             familyId={familyId} flash={flash} reload={reload}
           />
@@ -1190,9 +1203,10 @@ function ParentRewards({ redemptions, onFulfill }) {
   )
 }
 
-function ParentEdit({ tasks, decisions, rewards, familyId, flash, reload }) {
+function ParentEdit({ family, tasks, decisions, rewards, familyId, flash, reload }) {
   return (
     <div className="rq-fade">
+      <InvitePanel family={family} flash={flash} reload={reload} />
       <h2 style={S.h2}>Edit lists</h2>
       <ListEditor title="Daily tasks" hint="Small-point everyday chores."
         color="var(--slime)" items={tasks} table="tasks"
@@ -1201,6 +1215,60 @@ function ParentEdit({ tasks, decisions, rewards, familyId, flash, reload }) {
         color="var(--gold)" items={decisions} table="decisions"
         familyId={familyId} defaultPts={40} flash={flash} reload={reload} />
       <RewardEditor rewards={rewards} familyId={familyId} flash={flash} reload={reload} />
+    </div>
+  )
+}
+
+function InvitePanel({ family, flash, reload }) {
+  const [code, setCode] = useState(family.invite_code || null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!family.invite_code) {
+      setBusy(true)
+      ensureInviteCode(family).then((c) => {
+        setBusy(false)
+        if (c) { setCode(c); reload() }
+      })
+    } else {
+      setCode(family.invite_code)
+    }
+  }, [family.id, family.invite_code])
+
+  const copy = async () => {
+    if (!code) return
+    try {
+      await navigator.clipboard.writeText(code)
+      flash('Code copied')
+    } catch {
+      flash('Couldn\u2019t copy — read it out instead')
+    }
+  }
+
+  return (
+    <div style={{ ...S.feature, marginTop: 8, marginBottom: 28 }}>
+      <div style={S.featureKicker}>Add your kid</div>
+      <div style={{
+        fontFamily: "'Fraunces', serif", fontSize: 48, fontWeight: 400,
+        letterSpacing: '-0.04em', lineHeight: 1, color: '#fff',
+        margin: '4px 0 16px', fontVariationSettings: "'opsz' 144",
+      }}>
+        {busy ? '…' : (code || 'RQ-????')}
+      </div>
+      <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', lineHeight: 1.5, marginBottom: 18 }}>
+        On your kid&rsquo;s phone, open <strong style={{ color: '#fff' }}>www.myrewardquest.com</strong> in Safari,
+        tap &ldquo;New here? Create one,&rdquo; and enter this code as the <strong style={{ color: '#fff' }}>Family code</strong>.
+        Then add the app to her home screen.
+      </div>
+      <button onClick={copy} className="rq-press" disabled={!code || busy}
+        style={{
+          background: 'var(--accent)', color: '#fff', border: 'none',
+          borderRadius: 999, padding: '12px 22px',
+          fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 12,
+          letterSpacing: 0.5, textTransform: 'uppercase',
+        }}>
+        Copy code
+      </button>
     </div>
   )
 }

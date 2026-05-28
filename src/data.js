@@ -5,8 +5,12 @@ import { supabase } from './supabase.js'
    ============================================================ */
 
 /* ---- auth ---- */
-export async function signUp(email, password) {
-  return await supabase.auth.signUp({ email, password })
+export async function signUp(email, password, inviteCode) {
+  const opts = {}
+  if (inviteCode) {
+    opts.data = { pending_invite_code: inviteCode.trim().toUpperCase() }
+  }
+  return await supabase.auth.signUp({ email, password, options: opts })
 }
 export async function signIn(email, password) {
   return await supabase.auth.signInWithPassword({ email, password })
@@ -50,32 +54,62 @@ const DEFAULT_REWARDS = [
 ]
 
 /* find an existing family OR create a new one and claim parent role */
+/* generate a 6-char family invite code like "RQ-4F2K" (no ambiguous chars) */
+function generateInviteCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/1/I/L
+  let code = ''
+  for (let i = 0; i < 4; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)]
+  return 'RQ-' + code
+}
+
 export async function joinOrCreateFamily(user) {
-  // already linked via metadata?
+  // already linked via metadata? Use that.
   const existing = user.user_metadata && user.user_metadata.family_id
   if (existing) {
-    return { familyId: existing, role: user.user_metadata.role || 'kid', error: null }
+    // double-check the family still exists (paranoia)
+    const { data: famRow } = await supabase.from('families').select('id').eq('id', existing).maybeSingle()
+    if (famRow) {
+      return { familyId: existing, role: user.user_metadata.role || 'parent', error: null }
+    }
+    // Family was deleted — fall through and create a new one
   }
 
-  // Any family exists yet? If yes → join as kid. If no → become parent.
-  const { data: fams, error: famErr } = await supabase
-    .from('families').select('id').limit(1)
-  if (famErr) return { familyId: null, role: null, error: famErr }
+  // Did this user sign up with a pending invite code?
+  const pendingCode = user.user_metadata && user.user_metadata.pending_invite_code
+  if (pendingCode) {
+    const { data: famRow, error: lookupErr } = await supabase
+      .from('families')
+      .select('id')
+      .eq('invite_code', pendingCode)
+      .maybeSingle()
 
-  if (fams && fams.length > 0) {
-    const familyId = fams[0].id
+    if (lookupErr) return { familyId: null, role: null, error: lookupErr }
+    if (!famRow) {
+      return {
+        familyId: null,
+        role: null,
+        error: { message: `Family code "${pendingCode}" not found. Ask the parent to double-check the code in their app.` },
+      }
+    }
+
+    // Link this user as a kid in that family
     const { error: updErr } = await supabase.auth.updateUser({
-      data: { family_id: familyId, role: 'kid' },
+      data: { family_id: famRow.id, role: 'kid', pending_invite_code: null },
     })
     if (updErr) return { familyId: null, role: null, error: updErr }
-    return { familyId, role: 'kid', error: null }
+    return { familyId: famRow.id, role: 'kid', error: null }
   }
 
-  // create new family + defaults
+  // No metadata, no invite code → create a new family with this user as the parent
+  const inviteCode = generateInviteCode()
   const { data: famRow, error: createErr } = await supabase
     .from('families')
-    .insert({ name: 'My family', points: 0, lifetime_points: 0, streak: 1,
-              last_active: new Date().toISOString().slice(0, 10) })
+    .insert({
+      name: 'My family',
+      points: 0, lifetime_points: 0, streak: 1,
+      last_active: new Date().toISOString().slice(0, 10),
+      invite_code: inviteCode,
+    })
     .select().single()
   if (createErr) return { familyId: null, role: null, error: createErr }
   const familyId = famRow.id
@@ -97,6 +131,20 @@ export async function getFamily(familyId) {
 }
 export async function updateFamily(familyId, fields) {
   return await supabase.from('families').update(fields).eq('id', familyId)
+}
+
+/* If a family was created before invite codes existed, generate one now. Idempotent. */
+export async function ensureInviteCode(family) {
+  if (family.invite_code) return family.invite_code
+  const code = generateInviteCode()
+  const { error } = await supabase.from('families')
+    .update({ invite_code: code })
+    .eq('id', family.id)
+  if (error) {
+    console.error('ensureInviteCode failed', error)
+    return null
+  }
+  return code
 }
 
 /* ---- lists ---- */
