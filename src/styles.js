@@ -481,10 +481,11 @@ export const S = {
     fontWeight: 500, marginTop: 3, letterSpacing: -0.015,
   },
   redeemBtn: {
-    background: "var(--ink)",
-    color: "#fff", border: "none",
-    fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 11.5,
+    background: "var(--accent)",
+    color: "#ffffff", border: "none",
+    fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 11.5,
     padding: "10px 18px", borderRadius: 999, letterSpacing: 0.5, textTransform: "uppercase",
+    flexShrink: 0, lineHeight: 1, whiteSpace: "nowrap",
   },
   redeemLocked: {
     background: "transparent", border: "1px solid var(--hair)",
@@ -764,6 +765,23 @@ export const S = {
   personalizeActive: {
     borderColor: "var(--ink)", background: "var(--shelf)",
   },
+  /* avatar category bar — horizontally scrollable row, iOS-emoji-keyboard style */
+  catRow: {
+    display: "flex", gap: 4, marginBottom: 14, padding: "6px",
+    background: "var(--shelf)", borderRadius: 999,
+    overflowX: "auto", scrollSnapType: "x mandatory",
+    WebkitOverflowScrolling: "touch",
+  },
+  catBtn: {
+    flex: "0 0 auto", width: 44, height: 36, border: "none", background: "transparent",
+    borderRadius: 999, padding: 0, display: "flex", alignItems: "center",
+    justifyContent: "center", fontSize: 18, cursor: "pointer",
+    transition: "background .15s ease", scrollSnapAlign: "start",
+  },
+  catBtnActive: {
+    background: "var(--paper)",
+    boxShadow: "0 1px 3px rgba(10,10,10,.08)",
+  },
   themeSwatch: {
     aspectRatio: "1 / 1", borderRadius: 4,
     cursor: "pointer", border: "1px solid var(--hair)",
@@ -876,10 +894,31 @@ export const VIDEO_PROMPTS = [
 export const VIDEO_PTS = 25
 export const todayKey = () => new Date().toISOString().slice(0, 10)
 
-export const AVATAR_CHOICES = [
-  "🌸","💗","🦋","✨","💎","🌙","☀️","💫","🎀","🪐","🍑","🍓",
-  "🦄","🌈","🐱","🐰","🦊","🌻","💄","💅","👛","🕶️",
+export const AVATAR_CATEGORIES = [
+  { id: "cool",     icon: "⚡", label: "Cool",
+    items: ["⚡","🔥","⭐","✨","💫","🌟","☄️","🪐","🌙","☀️"] },
+  { id: "action",   icon: "🚗", label: "Action",
+    items: ["🚗","🏎️","🚀","🛸","🛹","🛼","🚲","🎮","🕹️","🎯"] },
+  { id: "sports",   icon: "⚽", label: "Sports",
+    items: ["⚽","🏀","🏈","⚾","🎾","🏐","🏊","🤸","🥇","🏆"] },
+  { id: "creature", icon: "🦖", label: "Creatures",
+    items: ["🦖","🦕","🐉","🦈","🐍","🦅","🦉","🐺","🦁","🐅"] },
+  { id: "animal",   icon: "🐱", label: "Animals",
+    items: ["🐱","🐶","🐰","🦊","🐼","🐻","🐯","🦔","🐢","🦋"] },
+  { id: "beauty",   icon: "💄", label: "Beauty",
+    items: ["💄","💅","💋","🎀","💖","💎","💍","👛","🕶️","🌸"] },
+  { id: "dance",    icon: "💃", label: "Dance",
+    items: ["💃","🩰","🪩","🎶","🎵","✨","🌟","💫","🦋","💖"] },
+  { id: "music",    icon: "🎤", label: "Music",
+    items: ["🎤","🎧","🎵","🎶","🎸","🎹","🥁","🎺","🎷","🪗"] },
+  { id: "food",     icon: "🍩", label: "Food",
+    items: ["🍩","🍦","🧁","🍰","🍪","🍓","🍑","🍒","🍕","🧋"] },
+  { id: "nature",   icon: "🌸", label: "Nature",
+    items: ["🌸","🌻","🌺","🌷","🌈","🌎","🦋","🐝","🌿","🍃"] },
 ]
+
+// Flat list (kept for backward compatibility / random selection)
+export const AVATAR_CHOICES = AVATAR_CATEGORIES.flatMap(c => c.items)
 
 export const THEMES = [
   { id: "signature", label: "Signature", gold: "#E91E63", goldDark: "#B71C4A", lav: "#0A0A0A", lavDark: "#0A0A0A" },
