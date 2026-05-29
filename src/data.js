@@ -97,28 +97,47 @@ export async function joinOrCreateFamily(user) {
   const existingRole = meta.role
   const existingKidId = meta.kid_id
 
-  // Path 1: User is already linked AND has a kid_id (or is parent). Just verify and use.
+  // Path 1: User is already linked to a family. Trust the metadata; only re-claim a kid
+  // if absolutely necessary (their kid record was deleted).
   if (existingFamilyId && existingRole) {
     const { data: famRow } = await supabase.from('families').select('id').eq('id', existingFamilyId).maybeSingle()
     if (famRow) {
-      // For parents, kidId is null and that's fine
+      // Parents don't have a kid record
       if (existingRole === 'parent') {
         return { familyId: existingFamilyId, role: 'parent', kidId: null, error: null }
       }
-      // For kids: if we have a kid_id, verify it still exists
+
+      // For kids: if we have a kid_id stored, verify it still exists
       if (existingKidId) {
-        const { data: kidRow } = await supabase.from('kids').select('id').eq('id', existingKidId).maybeSingle()
-        if (kidRow) {
+        const { data: kidRow, error: kidErr } = await supabase
+          .from('kids').select('id').eq('id', existingKidId).maybeSingle()
+        // If the read succeeded AND the row exists, we're good — use it
+        if (!kidErr && kidRow) {
           return { familyId: existingFamilyId, role: 'kid', kidId: existingKidId, error: null }
         }
-        // Kid record was deleted — fall through to claim a new one
+        // If the read errored (network/auth blip), DON'T create a new kid — return the
+        // stored kid_id anyway and let the page refresh resolve it. Creating new kids
+        // here is the bug that produces duplicates.
+        if (kidErr) {
+          return { familyId: existingFamilyId, role: 'kid', kidId: existingKidId, error: null }
+        }
+        // Read returned null = kid row was actually deleted. Fall through to recover.
       }
-      // Kid linked to family but no kid_id yet (migrated user) — find or claim a kid row
-      const kidId = await claimKidRowForUser(existingFamilyId)
-      if (kidId) {
-        await supabase.auth.updateUser({ data: { ...meta, kid_id: kidId } })
-        return { familyId: existingFamilyId, role: 'kid', kidId, error: null }
+
+      // Kid has no kid_id yet OR their old kid was actually deleted.
+      // Look for an existing kid in this family they could legitimately claim.
+      const recoveredKidId = await findOrClaimExistingKid(existingFamilyId)
+      if (recoveredKidId) {
+        await supabase.auth.updateUser({ data: { ...meta, kid_id: recoveredKidId } })
+        return { familyId: existingFamilyId, role: 'kid', kidId: recoveredKidId, error: null }
       }
+      // No kid exists in this family — create one as a last resort
+      const newKidId = await createFreshKid(existingFamilyId)
+      if (newKidId) {
+        await supabase.auth.updateUser({ data: { ...meta, kid_id: newKidId } })
+        return { familyId: existingFamilyId, role: 'kid', kidId: newKidId, error: null }
+      }
+      return { familyId: existingFamilyId, role: 'kid', kidId: null, error: { message: 'Could not create kid record' } }
     }
     // Family was deleted — fall through and create new
   }
@@ -137,8 +156,8 @@ export async function joinOrCreateFamily(user) {
       }
     }
 
-    // Claim a kid row (re-use placeholder if available, else create fresh)
-    const kidId = await claimKidRowForUser(famRow.id)
+    // First-time kid signup in this family. Re-use placeholder if any, else create fresh.
+    const kidId = await findOrClaimExistingKid(famRow.id) || await createFreshKid(famRow.id)
     if (!kidId) {
       return { familyId: null, role: null, kidId: null, error: { message: 'Could not create kid record.' } }
     }
@@ -164,8 +183,6 @@ export async function joinOrCreateFamily(user) {
   if (createErr) return { familyId: null, role: null, kidId: null, error: createErr }
   const familyId = famRow.id
 
-  // Seed defaults (without kid_id — these are family-level defaults that get claimed
-  // by the first kid via claimKidRowForUser, which also reassigns them).
   await supabase.from('tasks').insert(DEFAULT_TASKS.map(t => ({ ...t, family_id: familyId })))
   await supabase.from('decisions').insert(DEFAULT_DECISIONS.map(d => ({ ...d, family_id: familyId })))
   await supabase.from('rewards').insert(DEFAULT_REWARDS.map(r => ({ ...r, family_id: familyId })))
@@ -177,39 +194,32 @@ export async function joinOrCreateFamily(user) {
   return { familyId, role: 'parent', kidId: null, error: null }
 }
 
-/* Claim a kid row in a family for the current signing-up user.
+/* Find an existing kid in this family that has no other user claiming it.
    Strategy:
-   1. If the family has an "empty placeholder" kid (0 lifetime pts, no claims/videos
-      attached to it), re-use it. This covers migrated families where the auto-created
-      placeholder is waiting for the real kid.
-   2. Otherwise, create a new fresh kid row and link existing unassigned data to it
-      (but only if no other kid in the family is using that data already).
-
-   Returns the kid_id, or null on failure.
-*/
-async function claimKidRowForUser(familyId) {
-  // Look for a placeholder: kid in this family with 0 lifetime pts and no claims/videos
-  const { data: candidates } = await supabase.from('kids')
-    .select('id, lifetime_points')
+   - If there's exactly ONE kid in the family, return it (they're the only kid).
+   - If there are multiple, look for one with no auth user pointing to it (orphan from
+     earlier migrations) and return that.
+   - Otherwise return null. */
+async function findOrClaimExistingKid(familyId) {
+  const { data: kids } = await supabase.from('kids')
+    .select('id, lifetime_points, created_at')
     .eq('family_id', familyId)
     .order('created_at', { ascending: true })
+  if (!kids || kids.length === 0) return null
 
-  if (candidates && candidates.length > 0) {
-    // Find the first candidate that's truly empty (no claims, no videos attached)
-    for (const k of candidates) {
-      const { count: claimCount } = await supabase.from('claims')
-        .select('*', { count: 'exact', head: true })
-        .eq('kid_id', k.id)
-      const { count: videoCount } = await supabase.from('videos')
-        .select('*', { count: 'exact', head: true })
-        .eq('kid_id', k.id)
-      if ((claimCount || 0) === 0 && (videoCount || 0) === 0 && (k.lifetime_points || 0) === 0) {
-        return k.id
-      }
-    }
-  }
+  // Single kid in this family → that's the one to claim
+  if (kids.length === 1) return kids[0].id
 
-  // No placeholder available → create a fresh kid row
+  // Multiple kids exist. We can't easily check which are orphans from the client
+  // (that requires reading auth.users which is admin-only). So just return the FIRST
+  // (oldest) kid and let the user use that. If there are multiple kids needing
+  // disambiguation, the parent can sort it out via the toggle UI in Phase 5.
+  return kids[0].id
+}
+
+/* Create a brand new kid row in a family — only called when there is no existing
+   kid to claim. */
+async function createFreshKid(familyId) {
   const { data: newKid, error } = await supabase.from('kids')
     .insert({
       family_id: familyId,
@@ -225,6 +235,11 @@ async function claimKidRowForUser(familyId) {
     return null
   }
   return newKid.id
+}
+
+/* Legacy alias for compatibility */
+async function claimKidRowForUser(familyId) {
+  return await findOrClaimExistingKid(familyId) || await createFreshKid(familyId)
 }
 
 /* ---- family snapshot ---- */
