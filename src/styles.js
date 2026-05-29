@@ -810,6 +810,61 @@ export const S = {
     textTransform: "uppercase",
   },
 
+  /* ===== kid switcher (parent dashboard, hidden for one-kid families) ===== */
+  kidSwitchWrap: {
+    marginBottom: 18,
+  },
+  kidSwitchLabel: {
+    fontFamily: "'Inter', sans-serif", fontSize: 10.5, fontWeight: 600,
+    color: "var(--mute)", textTransform: "uppercase", letterSpacing: 1.8,
+    marginBottom: 8,
+  },
+  kidSwitchRow: {
+    display: "flex", gap: 8, overflowX: "auto",
+    paddingBottom: 4, WebkitOverflowScrolling: "touch",
+  },
+  kidChip: {
+    flexShrink: 0,
+  },
+  kidChipBtn: {
+    display: "flex", alignItems: "center", gap: 8,
+    background: "var(--paper)", border: "1px solid var(--hair)",
+    borderRadius: 999, padding: "8px 14px 8px 8px",
+    cursor: "pointer", color: "var(--ink)",
+    transition: "background .15s ease, border-color .15s ease",
+  },
+  kidChipActive: {},  // applied to outer; inner button overrides below
+  kidChipAvatar: {
+    fontSize: 16, lineHeight: 1,
+    width: 26, height: 26, borderRadius: 999,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    background: "var(--shelf)",
+  },
+  kidChipName: {
+    fontSize: 13, fontWeight: 600, letterSpacing: "-0.005em",
+  },
+  kidChipPts: {
+    fontFamily: "'Fraunces', serif", fontSize: 14, fontWeight: 500,
+    letterSpacing: "-0.02em", color: "var(--mute)",
+    paddingLeft: 8, marginLeft: 2, borderLeft: "1px solid var(--hair)",
+  },
+  kidChipInput: {
+    border: "1px solid var(--ink)", borderRadius: 999, padding: "8px 14px",
+    fontSize: 13, fontWeight: 600, outline: "none",
+    background: "var(--paper)", color: "var(--ink)",
+    width: 140,
+  },
+
+  editContextNote: {
+    background: "var(--shelf)", borderRadius: 4,
+    padding: "12px 14px", fontSize: 13, fontWeight: 500,
+    color: "var(--ink)", marginBottom: 20, lineHeight: 1.5,
+  },
+  editContextName: {
+    fontFamily: "'Fraunces', serif", fontStyle: "italic", fontWeight: 500,
+    color: "var(--accent)", fontSize: 15,
+  },
+
   /* ===== pending hero banner — parent dashboard ===== */
   pendingHero: {
     width: "100%", display: "flex", alignItems: "center", gap: 16,

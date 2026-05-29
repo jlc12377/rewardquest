@@ -935,6 +935,7 @@ function ParentApp({ familyId, user }) {
     <div style={themedApp}>
       <ParentHeader family={familyForView} pointsBump={pointsBump} />
       <main style={S.main}>
+        <KidSwitcher kids={kids} activeKidId={activeKidId} setActiveKidId={setActiveKidId} reload={reload} />
         <div style={S.modeRow}>
           <button onClick={() => setTab('home')}
             style={{ ...S.modeBtn, ...(tab === 'home' ? S.modeActive : {}) }}
@@ -979,6 +980,7 @@ function ParentApp({ familyId, user }) {
         {tab === 'edit' && (
           <ParentEdit
             family={family}
+            kids={kids} activeKidId={activeKidId}
             tasks={tasks} decisions={decisions} rewards={rewards}
             familyId={familyId} kidId={activeKidId}
             flash={flash} reload={reload}
@@ -1016,6 +1018,78 @@ function ParentHeader({ family, pointsBump }) {
         <span style={S.pointsLabel}>pts</span>
       </div>
     </header>
+  )
+}
+
+/* Kid switcher — appears at the top of the parent dashboard ONLY when there's
+   more than one kid in the family. For one-kid families, returns null so the UI
+   stays clean. Each chip shows avatar + first name + points; the active chip is
+   filled with the accent color. Long-press (or the small pencil) reveals a rename input. */
+function KidSwitcher({ kids, activeKidId, setActiveKidId, reload }) {
+  const [renamingId, setRenamingId] = useState(null)
+  const [draftName, setDraftName] = useState('')
+
+  // Hide entirely if there's just one kid (the common case for now)
+  if (!kids || kids.length < 2) return null
+
+  const commitRename = async (kidId) => {
+    const name = draftName.trim()
+    if (name) {
+      await updateKid(kidId, { name })
+    }
+    setRenamingId(null)
+    setDraftName('')
+    reload()
+  }
+
+  return (
+    <div style={S.kidSwitchWrap}>
+      <div style={S.kidSwitchLabel}>Viewing</div>
+      <div style={S.kidSwitchRow}>
+        {kids.map((k) => {
+          const isActive = k.id === activeKidId
+          const isRenaming = renamingId === k.id
+          const displayName = (k.name && k.name !== 'Kid' && k.name !== 'My family') ? k.name : 'Kid'
+          return (
+            <div key={k.id} style={{ ...S.kidChip, ...(isActive ? S.kidChipActive : {}) }}>
+              {isRenaming ? (
+                <input
+                  autoFocus value={draftName} onChange={(e) => setDraftName(e.target.value)}
+                  onBlur={() => commitRename(k.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitRename(k.id) }}
+                  style={S.kidChipInput} placeholder="Name"
+                />
+              ) : (
+                <button
+                  onClick={() => setActiveKidId(k.id)}
+                  onDoubleClick={() => { setRenamingId(k.id); setDraftName(displayName === 'Kid' ? '' : displayName) }}
+                  style={{
+                    ...S.kidChipBtn,
+                    ...(isActive ? {
+                      background: 'var(--ink)',
+                      borderColor: 'var(--ink)',
+                      color: '#fff',
+                    } : {}),
+                  }}
+                  className="rq-press"
+                  title="Tap to switch · Double-tap to rename"
+                >
+                  <span style={{
+                    ...S.kidChipAvatar,
+                    ...(isActive ? { background: 'rgba(255,255,255,0.15)' } : {}),
+                  }}>{k.avatar_emoji || '✨'}</span>
+                  <span style={S.kidChipName}>{displayName}</span>
+                  <span style={{
+                    ...S.kidChipPts,
+                    ...(isActive ? { color: 'var(--accent)', borderLeftColor: 'rgba(255,255,255,0.2)' } : {}),
+                  }}>{k.points || 0}</span>
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -1316,11 +1390,26 @@ function ParentRewards({ redemptions, onFulfill }) {
   )
 }
 
-function ParentEdit({ family, tasks, decisions, rewards, familyId, kidId, flash, reload }) {
+function ParentEdit({ family, kids, activeKidId, tasks, decisions, rewards, familyId, kidId, flash, reload }) {
+  const activeKid = (kids || []).find(k => k.id === activeKidId)
+  const showContext = (kids || []).length >= 2 && activeKid
+  const kidName = activeKid && activeKid.name && activeKid.name !== 'Kid' && activeKid.name !== 'My family'
+    ? activeKid.name : 'this kid'
+
   return (
     <div className="rq-fade">
       <InvitePanel family={family} flash={flash} reload={reload} />
       <h2 style={S.h2}>Edit lists</h2>
+      {showContext && (
+        <div style={S.editContextNote}>
+          Editing tasks &amp; rewards for{' '}
+          <span style={S.editContextName}>
+            <span style={{ marginRight: 6 }}>{activeKid.avatar_emoji || '✨'}</span>
+            {kidName}
+          </span>
+          . Switch kids using the chips at the top.
+        </div>
+      )}
       <ListEditor title="Daily tasks" hint="Small-point everyday chores."
         color="var(--accent)" items={tasks} table="tasks"
         familyId={familyId} kidId={kidId} defaultPts={5} flash={flash} reload={reload} />
