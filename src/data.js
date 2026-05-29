@@ -234,6 +234,16 @@ export async function getFamily(familyId) {
 export async function updateFamily(familyId, fields) {
   return await supabase.from('families').update(fields).eq('id', familyId)
 }
+export async function getKid(kidId) {
+  return await supabase.from('kids').select('*').eq('id', kidId).single()
+}
+export async function updateKid(kidId, fields) {
+  return await supabase.from('kids').update(fields).eq('id', kidId)
+}
+/* List all kids in a family, ordered by creation (kid #1 first) */
+export async function getKidsForFamily(familyId) {
+  return await supabase.from('kids').select('*').eq('family_id', familyId).order('created_at', { ascending: true })
+}
 
 /* If a family was created before invite codes existed, generate one now. Idempotent. */
 export async function ensureInviteCode(family) {
@@ -250,14 +260,20 @@ export async function ensureInviteCode(family) {
 }
 
 /* ---- lists ---- */
-export async function getTasks(familyId) {
-  return await supabase.from('tasks').select('*').eq('family_id', familyId).order('sort_order')
+export async function getTasks(familyId, kidId) {
+  let q = supabase.from('tasks').select('*').eq('family_id', familyId)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('sort_order')
 }
-export async function getDecisions(familyId) {
-  return await supabase.from('decisions').select('*').eq('family_id', familyId).order('sort_order')
+export async function getDecisions(familyId, kidId) {
+  let q = supabase.from('decisions').select('*').eq('family_id', familyId)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('sort_order')
 }
-export async function getRewards(familyId) {
-  return await supabase.from('rewards').select('*').eq('family_id', familyId).order('sort_order')
+export async function getRewards(familyId, kidId) {
+  let q = supabase.from('rewards').select('*').eq('family_id', familyId)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('sort_order')
 }
 export async function addRow(table, row) {
   return await supabase.from(table).insert(row).select().single()
@@ -270,39 +286,50 @@ export async function deleteRow(table, id) {
 }
 
 /* ---- counts (for badges + today line) ---- */
-export async function countApprovedClaims(familyId, kind = null) {
+export async function countApprovedClaims(familyId, kind = null, kidId) {
   let q = supabase.from('claims').select('id', { count: 'exact', head: true })
     .eq('family_id', familyId).eq('status', 'approved')
   if (kind) q = q.eq('kind', kind)
+  if (kidId) q = q.eq('kid_id', kidId)
   return await q
 }
-export async function countVideos(familyId) {
-  return await supabase.from('videos').select('id', { count: 'exact', head: true })
+export async function countVideos(familyId, kidId) {
+  let q = supabase.from('videos').select('id', { count: 'exact', head: true })
     .eq('family_id', familyId)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q
 }
-export async function countRedemptions(familyId) {
-  return await supabase.from('redemptions').select('id', { count: 'exact', head: true })
+export async function countRedemptions(familyId, kidId) {
+  let q = supabase.from('redemptions').select('id', { count: 'exact', head: true })
     .eq('family_id', familyId)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q
 }
-export async function countApprovedToday(familyId) {
+export async function countApprovedToday(familyId, kidId) {
   const today = new Date().toISOString().slice(0, 10)
-  return await supabase.from('claims').select('id', { count: 'exact', head: true })
+  let q = supabase.from('claims').select('id', { count: 'exact', head: true })
     .eq('family_id', familyId).eq('status', 'approved').eq('claim_date', today)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q
 }
 
 /* ---- claims ---- */
-export async function getPendingClaims(familyId) {
-  return await supabase.from('claims').select('*')
-    .eq('family_id', familyId).eq('status', 'pending')
-    .order('created_at', { ascending: false })
+export async function getPendingClaims(familyId, kidId) {
+  let q = supabase.from('claims').select('*').eq('family_id', familyId).eq('status', 'pending')
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('created_at', { ascending: false })
 }
-export async function getApprovedToday(familyId) {
+export async function getApprovedToday(familyId, kidId) {
   const today = new Date().toISOString().slice(0, 10)
-  return await supabase.from('claims').select('*')
+  let q = supabase.from('claims').select('*')
     .eq('family_id', familyId).eq('status', 'approved').eq('claim_date', today)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q
 }
-export async function submitClaim(familyId, claim) {
-  return await supabase.from('claims').insert({ ...claim, family_id: familyId }).select().single()
+export async function submitClaim(familyId, claim, kidId) {
+  const row = { ...claim, family_id: familyId }
+  if (kidId) row.kid_id = kidId
+  return await supabase.from('claims').insert(row).select().single()
 }
 export async function resolveClaim(claimId, status) {
   return await supabase.from('claims').update({
@@ -311,25 +338,27 @@ export async function resolveClaim(claimId, status) {
 }
 
 /* ---- videos ---- */
-export async function getVideos(familyId, limit = 50) {
-  return await supabase.from('videos').select('*')
-    .eq('family_id', familyId).order('created_at', { ascending: false }).limit(limit)
+export async function getVideos(familyId, limit = 50, kidId) {
+  let q = supabase.from('videos').select('*').eq('family_id', familyId)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('created_at', { ascending: false }).limit(limit)
 }
-export async function addVideo(familyId, prompt, mediaUrl, mediaType) {
-  return await supabase.from('videos').insert({
-    family_id: familyId, prompt, media_url: mediaUrl, media_type: mediaType,
-  }).select().single()
+export async function addVideo(familyId, prompt, mediaUrl, mediaType, kidId) {
+  const row = { family_id: familyId, prompt, media_url: mediaUrl, media_type: mediaType }
+  if (kidId) row.kid_id = kidId
+  return await supabase.from('videos').insert(row).select().single()
 }
 
 /* ---- redemptions ---- */
-export async function getRedemptions(familyId, limit = 30) {
-  return await supabase.from('redemptions').select('*')
-    .eq('family_id', familyId).order('created_at', { ascending: false }).limit(limit)
+export async function getRedemptions(familyId, limit = 30, kidId) {
+  let q = supabase.from('redemptions').select('*').eq('family_id', familyId)
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('created_at', { ascending: false }).limit(limit)
 }
-export async function addRedemption(familyId, reward) {
-  return await supabase.from('redemptions').insert({
-    family_id: familyId, reward_label: reward.label, cost: reward.cost, emoji: reward.emoji,
-  })
+export async function addRedemption(familyId, reward, kidId) {
+  const row = { family_id: familyId, reward_label: reward.label, cost: reward.cost, emoji: reward.emoji }
+  if (kidId) row.kid_id = kidId
+  return await supabase.from('redemptions').insert(row)
 }
 export async function markRedemptionFulfilled(redemptionId) {
   return await supabase.from('redemptions').update({ fulfilled: true }).eq('id', redemptionId)
@@ -354,6 +383,8 @@ export function subscribeFamily(familyId, onChange) {
         filter: `family_id=eq.${familyId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'families',
         filter: `id=eq.${familyId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kids',
+        filter: `family_id=eq.${familyId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'videos',
         filter: `family_id=eq.${familyId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'redemptions',

@@ -7,6 +7,7 @@ import {
 import {
   signUp, signIn, signOut, getSession,
   joinOrCreateFamily, getFamily, updateFamily, ensureInviteCode,
+  getKid, updateKid, getKidsForFamily,
   getTasks, getDecisions, getRewards, addRow, updateRow, deleteRow,
   getPendingClaims, submitClaim, resolveClaim,
   getVideos, addVideo, getRedemptions, addRedemption, markRedemptionFulfilled,
@@ -269,6 +270,7 @@ function KidApp({ familyId, kidId, user }) {
   const [tab, setTab] = useState('home')
   const [toast, setToast] = useState(null)
   const [family, setFamily] = useState(null)
+  const [kid, setKid] = useState(null)
   const [tasks, setTasks] = useState([])
   const [decisions, setDecisions] = useState([])
   const [rewards, setRewards] = useState([])
@@ -284,13 +286,22 @@ function KidApp({ familyId, kidId, user }) {
   const lastPointsRef = useRef(null)
 
   const reload = useCallback(async () => {
-    const [f, t, d, r, p, v, ca, cc, cv, cr, ct] = await Promise.all([
-      getFamily(familyId), getTasks(familyId), getDecisions(familyId),
-      getRewards(familyId), getPendingClaims(familyId), getVideos(familyId, 10),
-      countApprovedClaims(familyId), countApprovedClaims(familyId, 'chore'),
-      countVideos(familyId), countRedemptions(familyId), countApprovedToday(familyId),
+    const [f, k, t, d, r, p, v, ca, cc, cv, cr, ct] = await Promise.all([
+      getFamily(familyId),
+      kidId ? getKid(kidId) : Promise.resolve({ data: null }),
+      getTasks(familyId, kidId),
+      getDecisions(familyId, kidId),
+      getRewards(familyId, kidId),
+      getPendingClaims(familyId, kidId),
+      getVideos(familyId, 10, kidId),
+      countApprovedClaims(familyId, null, kidId),
+      countApprovedClaims(familyId, 'chore', kidId),
+      countVideos(familyId, kidId),
+      countRedemptions(familyId, kidId),
+      countApprovedToday(familyId, kidId),
     ])
     if (f.data) setFamily(f.data)
+    if (k.data) setKid(k.data)
     if (t.data) setTasks(t.data)
     if (d.data) setDecisions(d.data)
     if (r.data) setRewards(r.data)
@@ -300,16 +311,16 @@ function KidApp({ familyId, kidId, user }) {
       approved: ca.count || 0, chores: cc.count || 0,
       videos: cv.count || 0, redemptions: cr.count || 0, today: ct.count || 0,
     })
-  }, [familyId])
+  }, [familyId, kidId])
 
   useEffect(() => { reload() }, [reload])
   useEffect(() => subscribeFamily(familyId, reload), [familyId, reload])
 
   /* detect newly unlocked badges + point increases → celebrate */
   useEffect(() => {
-    if (!family) return
+    if (!kid) return
     const badges = evaluateBadges({
-      family, claimsCount: counts.approved, videosCount: counts.videos,
+      family: kid, claimsCount: counts.approved, videosCount: counts.videos,
       redemptionsCount: counts.redemptions, choreApprovedCount: counts.chores,
     })
     const hitIds = badges.filter(b => b.hit).map(b => b.id)
@@ -317,7 +328,7 @@ function KidApp({ familyId, kidId, user }) {
     if (seen === null) {
       // first load — record current state, don't celebrate retroactively
       seenBadgesRef.current = new Set(hitIds)
-      lastPointsRef.current = family.points || 0
+      lastPointsRef.current = kid.points || 0
       return
     }
     // new badges since last render
@@ -329,13 +340,13 @@ function KidApp({ familyId, kidId, user }) {
       newly.forEach(id => seen.add(id))
     }
     // point increase → confetti
-    if ((family.points || 0) > (lastPointsRef.current || 0)) {
+    if ((kid.points || 0) > (lastPointsRef.current || 0)) {
       setConfettiKey(k => k + 1)
       setPointsBump(true)
       setTimeout(() => setPointsBump(false), 700)
     }
-    lastPointsRef.current = family.points || 0
-  }, [family, counts])
+    lastPointsRef.current = kid.points || 0
+  }, [kid, counts])
 
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2600) }
 
@@ -348,7 +359,7 @@ function KidApp({ familyId, kidId, user }) {
       kind, label: item.label, points: item.points,
       media_url: url, media_type: mediaType, status: 'pending',
       claim_date: todayKey(),
-    })
+    }, kidId)
     if (error) { flash('Could not submit — try again'); return }
     flash(kind === 'chore' ? 'Sent! Waiting for parent ✓' : 'Smart choice sent 🌟')
     reload()
@@ -359,34 +370,34 @@ function KidApp({ familyId, kidId, user }) {
     const { url, error: upErr } = await uploadProof(file, 'video')
     if (upErr) { flash('Upload failed — try again'); return }
     const mediaType = file.type.startsWith('video') ? 'video' : 'photo'
-    await addVideo(familyId, prompt, url, mediaType)
+    await addVideo(familyId, prompt, url, mediaType, kidId)
     await submitClaim(familyId, {
       kind: 'choice', label: 'Video reflection: ' + prompt,
       points: VIDEO_PTS, media_url: url, media_type: mediaType,
       status: 'pending', claim_date: todayKey(),
-    })
+    }, kidId)
     flash('Video sent for parent to confirm 🎥')
     reload()
   }
 
   const onRedeem = async (reward) => {
-    if ((family.points || 0) < reward.cost) return
-    await updateFamily(familyId, { points: family.points - reward.cost })
-    await addRedemption(familyId, reward)
+    if (!kid || (kid.points || 0) < reward.cost) return
+    await updateKid(kidId, { points: kid.points - reward.cost })
+    await addRedemption(familyId, reward, kidId)
     flash(`Redeemed: ${reward.label}! 🎉`)
     reload()
   }
 
   const onSavePersonalize = async ({ avatar, theme }) => {
-    await updateFamily(familyId, { avatar_emoji: avatar, theme })
+    await updateKid(kidId, { avatar_emoji: avatar, theme })
     flash('Looking good ✨')
     reload()
   }
 
-  if (!family) return <Splash msg="Loading your quest…" />
+  if (!family || !kid) return <Splash msg="Loading your quest…" />
 
-  /* apply theme accent override */
-  const theme = themeById(family.theme)
+  /* apply theme accent override (per-kid now) */
+  const theme = themeById(kid.theme)
   const themedApp = {
     ...S.app,
     "--accent": theme.accent,
@@ -396,23 +407,23 @@ function KidApp({ familyId, kidId, user }) {
 
   return (
     <div style={themedApp}>
-      <KidHeader family={family} pointsBump={pointsBump} />
+      <KidHeader family={kid} pointsBump={pointsBump} />
       <main style={S.main}>
         {tab === 'home' && (
-          <KidHome family={family} rewards={rewards} pending={pending}
+          <KidHome family={kid} rewards={rewards} pending={pending}
             counts={counts} setTab={setTab} />
         )}
         {tab === 'tasks' && (
-          <KidTasks family={family} tasks={tasks} decisions={decisions}
+          <KidTasks family={kid} tasks={tasks} decisions={decisions}
             pending={pending} onSubmit={onSubmitClaim} />
         )}
-        {tab === 'video' && <KidVideo onSave={onSaveVideo} videos={videos} family={family} />}
-        {tab === 'store' && <KidStore family={family} rewards={rewards} onRedeem={onRedeem} />}
-        {tab === 'me'    && <KidMe family={family} onSave={onSavePersonalize} />}
+        {tab === 'video' && <KidVideo onSave={onSaveVideo} videos={videos} family={kid} />}
+        {tab === 'store' && <KidStore family={kid} rewards={rewards} onRedeem={onRedeem} />}
+        {tab === 'me'    && <KidMe family={kid} onSave={onSavePersonalize} />}
       </main>
 
       {toast && <div style={S.toast} className="rq-toast">{toast}</div>}
-      {confettiKey > 0 && <Confetti k={confettiKey} themeGold={theme.gold} />}
+      {confettiKey > 0 && <Confetti k={confettiKey} themeGold={theme.accent} />}
       {badgePop && <BadgePop badge={badgePop} />}
 
       <nav style={S.nav}>
@@ -792,6 +803,8 @@ function ParentApp({ familyId, user }) {
   const [tab, setTab] = useState('home')
   const [toast, setToast] = useState(null)
   const [family, setFamily] = useState(null)
+  const [kids, setKids] = useState([])
+  const [activeKidId, setActiveKidId] = useState(null)
   const [tasks, setTasks] = useState([])
   const [decisions, setDecisions] = useState([])
   const [rewards, setRewards] = useState([])
@@ -803,13 +816,25 @@ function ParentApp({ familyId, user }) {
   const [confettiKey, setConfettiKey] = useState(0)
   const [pointsBump, setPointsBump] = useState(false)
 
+  /* The "active kid" — derived from the activeKidId. */
+  const activeKid = kids.find(k => k.id === activeKidId) || null
+
   const reload = useCallback(async () => {
-    const [f, t, d, r, p, v, red] = await Promise.all([
-      getFamily(familyId), getTasks(familyId), getDecisions(familyId),
-      getRewards(familyId), getPendingClaims(familyId), getVideos(familyId, 50),
-      getRedemptions(familyId, 20),
-    ])
+    const [f, ks] = await Promise.all([getFamily(familyId), getKidsForFamily(familyId)])
     if (f.data) setFamily(f.data)
+    if (ks.data) setKids(ks.data)
+    // pick the first kid as active if we don't have one yet
+    let curKid = activeKidId
+    if ((!curKid || !ks.data?.find(k => k.id === curKid)) && ks.data?.length) {
+      curKid = ks.data[0].id
+      setActiveKidId(curKid)
+    }
+    // fetch per-kid data scoped to the active kid
+    const [t, d, r, p, v, red] = await Promise.all([
+      getTasks(familyId, curKid), getDecisions(familyId, curKid),
+      getRewards(familyId, curKid), getPendingClaims(familyId, curKid),
+      getVideos(familyId, 50, curKid), getRedemptions(familyId, 20, curKid),
+    ])
     if (t.data) setTasks(t.data)
     if (d.data) setDecisions(d.data)
     if (r.data) setRewards(r.data)
@@ -817,28 +842,33 @@ function ParentApp({ familyId, user }) {
     if (v.data) setVideos(v.data)
     if (red.data) setRedemptions(red.data)
 
-    /* recent claims (any status) for the Lately feed */
-    const { data: rc } = await supabase.from('claims')
-      .select('*').eq('family_id', familyId)
+    /* recent claims (any status) for the Lately feed — scoped to active kid */
+    let rcQuery = supabase.from('claims').select('*').eq('family_id', familyId)
       .neq('status', 'pending')
       .order('resolved_at', { ascending: false, nullsFirst: false })
       .limit(8)
+    if (curKid) rcQuery = rcQuery.eq('kid_id', curKid)
+    const { data: rc } = await rcQuery
     if (rc) setRecentClaims(rc)
 
-    /* this-week stats */
+    /* this-week stats — scoped to active kid */
     const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString()
-    const { data: weekRows } = await supabase.from('claims')
-      .select('points,kind,created_at,status')
-      .eq('family_id', familyId).eq('status', 'approved')
-      .gte('created_at', weekAgo)
-    const { data: vidRows } = await supabase.from('videos')
-      .select('id,created_at').eq('family_id', familyId).gte('created_at', weekAgo)
+    let weekQ = supabase.from('claims').select('points,kind,created_at,status')
+      .eq('family_id', familyId).eq('status', 'approved').gte('created_at', weekAgo)
+    if (curKid) weekQ = weekQ.eq('kid_id', curKid)
+    const { data: weekRows } = await weekQ
+
+    let vidQ = supabase.from('videos').select('id,created_at')
+      .eq('family_id', familyId).gte('created_at', weekAgo)
+    if (curKid) vidQ = vidQ.eq('kid_id', curKid)
+    const { data: vidRows } = await vidQ
+
     setCounts({
       weekPts: (weekRows || []).reduce((s, r) => s + (r.points || 0), 0),
       weekClaims: (weekRows || []).length,
       weekVideos: (vidRows || []).length,
     })
-  }, [familyId])
+  }, [familyId, activeKidId])
 
   useEffect(() => { reload() }, [reload])
   useEffect(() => subscribeFamily(familyId, reload), [familyId, reload])
@@ -847,10 +877,18 @@ function ParentApp({ familyId, user }) {
 
   const onApprove = async (claim) => {
     await resolveClaim(claim.id, 'approved')
-    await updateFamily(familyId, {
-      points: (family.points || 0) + claim.points,
-      lifetime_points: (family.lifetime_points || 0) + claim.points,
-    })
+    // Determine which kid receives the points. Prefer the claim's own kid_id (most accurate);
+    // fall back to active kid (one-kid families).
+    const targetKidId = claim.kid_id || activeKidId
+    if (targetKidId) {
+      const { data: kRow } = await supabase.from('kids').select('points, lifetime_points').eq('id', targetKidId).single()
+      if (kRow) {
+        await updateKid(targetKidId, {
+          points: (kRow.points || 0) + claim.points,
+          lifetime_points: (kRow.lifetime_points || 0) + claim.points,
+        })
+      }
+    }
     flash(`+${claim.points} approved 🎉`)
     setConfettiKey(k => k + 1)
     setPointsBump(true)
@@ -878,7 +916,8 @@ function ParentApp({ familyId, user }) {
 
   if (!family) return <Splash msg="Loading dashboard…" />
 
-  const theme = themeById(family.theme)
+  /* Use the active kid's theme if available, else the family default. */
+  const theme = themeById(activeKid?.theme || family.theme)
   const themedApp = {
     ...S.app,
     "--accent": theme.accent,
@@ -886,9 +925,15 @@ function ParentApp({ familyId, user }) {
     "--accentDark": theme.accentDark,
   }
 
+  /* Pass active kid as `family` to child components so the existing
+     references like `family.points` continue to work and read kid-specific data.
+     For one-kid families this is invisible. For multi-kid this will be controlled
+     by a toggle (Phase 5). */
+  const familyForView = activeKid || family
+
   return (
     <div style={themedApp}>
-      <ParentHeader family={family} pointsBump={pointsBump} />
+      <ParentHeader family={familyForView} pointsBump={pointsBump} />
       <main style={S.main}>
         <div style={S.modeRow}>
           <button onClick={() => setTab('home')}
@@ -920,14 +965,14 @@ function ParentApp({ familyId, user }) {
         </div>
 
         {tab === 'home' && (
-          <ParentHome family={family} pending={pending} videos={videos}
+          <ParentHome family={familyForView} pending={pending} videos={videos}
             rewards={rewards} redemptions={redemptions} recentClaims={recentClaims}
             counts={counts} setTab={setTab} />
         )}
         {tab === 'approvals' && (
           <ParentApprovals pending={pending} onApprove={onApprove} onDecline={onDecline} />
         )}
-        {tab === 'videos' && <ParentVideos videos={videos} family={family} />}
+        {tab === 'videos' && <ParentVideos videos={videos} family={familyForView} />}
         {tab === 'rewards' && (
           <ParentRewards redemptions={redemptions} onFulfill={onFulfill} />
         )}
@@ -935,7 +980,8 @@ function ParentApp({ familyId, user }) {
           <ParentEdit
             family={family}
             tasks={tasks} decisions={decisions} rewards={rewards}
-            familyId={familyId} flash={flash} reload={reload}
+            familyId={familyId} kidId={activeKidId}
+            flash={flash} reload={reload}
           />
         )}
 
@@ -944,7 +990,7 @@ function ParentApp({ familyId, user }) {
         </button>
       </main>
       {toast && <div style={S.toast} className="rq-toast">{toast}</div>}
-      {confettiKey > 0 && <Confetti k={confettiKey} themeGold={theme.gold} />}
+      {confettiKey > 0 && <Confetti k={confettiKey} themeGold={theme.accent} />}
     </div>
   )
 }
@@ -1270,18 +1316,18 @@ function ParentRewards({ redemptions, onFulfill }) {
   )
 }
 
-function ParentEdit({ family, tasks, decisions, rewards, familyId, flash, reload }) {
+function ParentEdit({ family, tasks, decisions, rewards, familyId, kidId, flash, reload }) {
   return (
     <div className="rq-fade">
       <InvitePanel family={family} flash={flash} reload={reload} />
       <h2 style={S.h2}>Edit lists</h2>
       <ListEditor title="Daily tasks" hint="Small-point everyday chores."
-        color="var(--slime)" items={tasks} table="tasks"
-        familyId={familyId} defaultPts={5} flash={flash} reload={reload} />
+        color="var(--accent)" items={tasks} table="tasks"
+        familyId={familyId} kidId={kidId} defaultPts={5} flash={flash} reload={reload} />
       <ListEditor title="Smart choices" hint="Big-point good decisions."
         color="var(--accent)" items={decisions} table="decisions"
-        familyId={familyId} defaultPts={40} flash={flash} reload={reload} />
-      <RewardEditor rewards={rewards} familyId={familyId} flash={flash} reload={reload} />
+        familyId={familyId} kidId={kidId} defaultPts={40} flash={flash} reload={reload} />
+      <RewardEditor rewards={rewards} familyId={familyId} kidId={kidId} flash={flash} reload={reload} />
     </div>
   )
 }
@@ -1340,7 +1386,7 @@ function InvitePanel({ family, flash, reload }) {
   )
 }
 
-function ListEditor({ title, hint, color, items, table, familyId, defaultPts, flash, reload }) {
+function ListEditor({ title, hint, color, items, table, familyId, kidId, defaultPts, flash, reload }) {
   const [label, setLabel] = useState('')
   const [pts, setPts] = useState(defaultPts)
   const [editId, setEditId] = useState(null)
@@ -1351,7 +1397,9 @@ function ListEditor({ title, hint, color, items, table, familyId, defaultPts, fl
     const text = label.trim()
     if (!text) { flash('Add a name first'); return }
     const n = Math.max(1, parseInt(pts, 10) || defaultPts)
-    const { error } = await addRow(table, { family_id: familyId, label: text, points: n, sort_order: items.length + 1 })
+    const row = { family_id: familyId, label: text, points: n, sort_order: items.length + 1 }
+    if (kidId) row.kid_id = kidId
+    const { error } = await addRow(table, row)
     if (error) { flash('Save failed'); return }
     setLabel(''); setPts(defaultPts); flash(`Added to ${title}`); reload()
   }
@@ -1407,7 +1455,7 @@ function ListEditor({ title, hint, color, items, table, familyId, defaultPts, fl
   )
 }
 
-function RewardEditor({ rewards, familyId, flash, reload }) {
+function RewardEditor({ rewards, familyId, kidId, flash, reload }) {
   const [label, setLabel] = useState('')
   const [tier, setTier] = useState('Small')
   const [cost, setCost] = useState(50)
@@ -1419,9 +1467,11 @@ function RewardEditor({ rewards, familyId, flash, reload }) {
     const text = label.trim()
     if (!text) { flash('Add a name first'); return }
     const c = Math.max(1, parseInt(cost, 10) || 50)
-    await addRow('rewards', {
+    const row = {
       family_id: familyId, label: text, tier, cost: c, emoji, sort_order: rewards.length + 1,
-    })
+    }
+    if (kidId) row.kid_id = kidId
+    await addRow('rewards', row)
     setLabel(''); setCost(50); setEmoji('🎁'); setTier('Small')
     flash('Reward added'); reload()
   }
