@@ -827,11 +827,23 @@ export const S = {
     flexShrink: 0,
   },
   kidChipBtn: {
-    display: "flex", alignItems: "center", gap: 8,
+    display: "flex", alignItems: "stretch", gap: 0,
     background: "var(--paper)", border: "1px solid var(--hair)",
-    borderRadius: 999, padding: "8px 14px 8px 8px",
-    cursor: "pointer", color: "var(--ink)",
+    borderRadius: 999, padding: 0,
+    color: "var(--ink)", overflow: "hidden",
     transition: "background .15s ease, border-color .15s ease",
+  },
+  kidChipInner: {
+    display: "flex", alignItems: "center", gap: 8,
+    background: "transparent", border: "none",
+    padding: "8px 4px 8px 8px", cursor: "pointer", color: "inherit",
+  },
+  kidChipPencil: {
+    background: "transparent", border: "none",
+    padding: "8px 12px 8px 8px", cursor: "pointer",
+    color: "var(--mute)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    borderLeft: "1px solid transparent",
   },
   kidChipActive: {},  // applied to outer; inner button overrides below
   kidChipAvatar: {
@@ -863,6 +875,37 @@ export const S = {
   editContextName: {
     fontFamily: "'Fraunces', serif", fontStyle: "italic", fontWeight: 500,
     color: "var(--accent)", fontSize: 15,
+  },
+
+  /* ===== Manage kids panel (Edit tab) ===== */
+  kidsManagerWrap: {
+    marginBottom: 30, paddingBottom: 20,
+    borderBottom: "1px solid var(--hair)",
+  },
+  kidsManagerRow: {
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "12px 0", borderBottom: "1px solid var(--hair)",
+  },
+  kidsManagerAvatar: {
+    width: 40, height: 40, borderRadius: 999,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 20, background: "var(--shelf)",
+    border: "1px solid var(--hair)", flexShrink: 0,
+  },
+  kidsManagerInfo: {
+    flex: 1, minWidth: 0,
+  },
+  kidsManagerName: {
+    fontSize: 15, fontWeight: 600, color: "var(--ink)",
+    letterSpacing: "-0.01em",
+  },
+  kidsManagerMeta: {
+    fontSize: 12, color: "var(--mute)", marginTop: 2,
+  },
+  kidsManagerInput: {
+    flex: 1, border: "1px solid var(--ink)", borderRadius: 4,
+    padding: "8px 12px", fontSize: 14, fontWeight: 500, outline: "none",
+    background: "var(--paper)", color: "var(--ink)",
   },
 
   /* ===== pending hero banner — parent dashboard ===== */

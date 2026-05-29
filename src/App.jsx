@@ -1060,30 +1060,47 @@ function KidSwitcher({ kids, activeKidId, setActiveKidId, reload }) {
                   style={S.kidChipInput} placeholder="Name"
                 />
               ) : (
-                <button
-                  onClick={() => setActiveKidId(k.id)}
-                  onDoubleClick={() => { setRenamingId(k.id); setDraftName(displayName === 'Kid' ? '' : displayName) }}
-                  style={{
-                    ...S.kidChipBtn,
-                    ...(isActive ? {
-                      background: 'var(--ink)',
-                      borderColor: 'var(--ink)',
-                      color: '#fff',
-                    } : {}),
-                  }}
-                  className="rq-press"
-                  title="Tap to switch · Double-tap to rename"
-                >
-                  <span style={{
-                    ...S.kidChipAvatar,
-                    ...(isActive ? { background: 'rgba(255,255,255,0.15)' } : {}),
-                  }}>{k.avatar_emoji || '✨'}</span>
-                  <span style={S.kidChipName}>{displayName}</span>
-                  <span style={{
-                    ...S.kidChipPts,
-                    ...(isActive ? { color: 'var(--accent)', borderLeftColor: 'rgba(255,255,255,0.2)' } : {}),
-                  }}>{k.points || 0}</span>
-                </button>
+                <div style={{
+                  ...S.kidChipBtn,
+                  ...(isActive ? {
+                    background: 'var(--ink)',
+                    borderColor: 'var(--ink)',
+                    color: '#fff',
+                  } : {}),
+                }}>
+                  <button
+                    onClick={() => setActiveKidId(k.id)}
+                    style={S.kidChipInner}
+                    className="rq-press"
+                    title="Tap to switch"
+                  >
+                    <span style={{
+                      ...S.kidChipAvatar,
+                      ...(isActive ? { background: 'rgba(255,255,255,0.15)' } : {}),
+                    }}>{k.avatar_emoji || '✨'}</span>
+                    <span style={S.kidChipName}>{displayName}</span>
+                    <span style={{
+                      ...S.kidChipPts,
+                      ...(isActive ? { color: 'var(--accent)', borderLeftColor: 'rgba(255,255,255,0.2)' } : {}),
+                    }}>{k.points || 0}</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setRenamingId(k.id)
+                      setDraftName(displayName === 'Kid' ? '' : displayName)
+                    }}
+                    style={{
+                      ...S.kidChipPencil,
+                      ...(isActive ? { color: 'rgba(255,255,255,0.7)' } : {}),
+                    }}
+                    className="rq-press"
+                    title="Rename"
+                    aria-label={`Rename ${displayName}`}
+                  >
+                    <Pencil size={12} />
+                  </button>
+                </div>
               )}
             </div>
           )
@@ -1399,6 +1416,7 @@ function ParentEdit({ family, kids, activeKidId, tasks, decisions, rewards, fami
   return (
     <div className="rq-fade">
       <InvitePanel family={family} flash={flash} reload={reload} />
+      <KidsManager kids={kids} flash={flash} reload={reload} />
       <h2 style={S.h2}>Edit lists</h2>
       {showContext && (
         <div style={S.editContextNote}>
@@ -1417,6 +1435,72 @@ function ParentEdit({ family, kids, activeKidId, tasks, decisions, rewards, fami
         color="var(--accent)" items={decisions} table="decisions"
         familyId={familyId} kidId={kidId} defaultPts={40} flash={flash} reload={reload} />
       <RewardEditor rewards={rewards} familyId={familyId} kidId={kidId} flash={flash} reload={reload} />
+    </div>
+  )
+}
+
+/* Manage kids panel — visible only when there are 2+ kids in the family.
+   Lets the parent rename each kid inline. Delete is intentionally NOT here:
+   deleting a kid is a serious action (kills their data + signs them out),
+   and should only happen by deleting the user account in Supabase. */
+function KidsManager({ kids, flash, reload }) {
+  const [editingId, setEditingId] = useState(null)
+  const [draftName, setDraftName] = useState('')
+
+  if (!kids || kids.length < 2) return null
+
+  const beginEdit = (k) => {
+    setEditingId(k.id)
+    setDraftName((k.name && k.name !== 'Kid' && k.name !== 'My family') ? k.name : '')
+  }
+  const commit = async () => {
+    const name = draftName.trim()
+    if (!name) { setEditingId(null); return }
+    await updateKid(editingId, { name })
+    setEditingId(null)
+    flash('Renamed')
+    reload()
+  }
+
+  return (
+    <div style={S.kidsManagerWrap}>
+      <h2 style={S.h2}>Your kids</h2>
+      <p style={S.sectionHint}>Tap the pencil to rename. Each kid has their own tasks, rewards, and point balance.</p>
+      {kids.map((k) => {
+        const isEditing = editingId === k.id
+        const displayName = (k.name && k.name !== 'Kid' && k.name !== 'My family') ? k.name : 'Kid'
+        return (
+          <div key={k.id} style={S.kidsManagerRow}>
+            <div style={S.kidsManagerAvatar}>{k.avatar_emoji || '✨'}</div>
+            {isEditing ? (
+              <>
+                <input
+                  autoFocus value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
+                  style={S.kidsManagerInput}
+                  placeholder="e.g. Olivia"
+                />
+                <button onClick={commit} style={S.iconBtnGo} className="rq-press">
+                  <Check size={15} />
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={S.kidsManagerInfo}>
+                  <div style={S.kidsManagerName}>{displayName}</div>
+                  <div style={S.kidsManagerMeta}>
+                    {k.points || 0} pts · {k.lifetime_points || 0} lifetime
+                  </div>
+                </div>
+                <button onClick={() => beginEdit(k)} style={S.iconBtnEdit} className="rq-press" aria-label="Rename">
+                  <Pencil size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
