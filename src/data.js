@@ -346,10 +346,10 @@ export async function submitClaim(familyId, claim, kidId) {
   if (kidId) row.kid_id = kidId
   return await supabase.from('claims').insert(row).select().single()
 }
-export async function resolveClaim(claimId, status) {
-  return await supabase.from('claims').update({
-    status, resolved_at: new Date().toISOString(),
-  }).eq('id', claimId)
+export async function resolveClaim(claimId, status, approverUserId) {
+  const fields = { status, resolved_at: new Date().toISOString() }
+  if (approverUserId) fields.approver_user_id = approverUserId
+  return await supabase.from('claims').update(fields).eq('id', claimId)
 }
 
 /* ---- videos ---- */
@@ -377,6 +377,116 @@ export async function addRedemption(familyId, reward, kidId) {
 }
 export async function markRedemptionFulfilled(redemptionId) {
   return await supabase.from('redemptions').update({ fulfilled: true }).eq('id', redemptionId)
+}
+
+/* ============================================================
+   PARENT REWARDS — recurring unlocks based on weekly win count.
+   "Wins" = number of claims this parent has approved in the past 7 days.
+   Each reward has a `threshold` — when this week's wins >= threshold,
+   the reward is "unlocked" for the week.
+   ============================================================ */
+
+export async function getParentRewards(userId) {
+  return await supabase.from('parent_rewards')
+    .select('*').eq('user_id', userId).order('sort_order')
+}
+export async function addParentReward(familyId, userId, reward) {
+  return await supabase.from('parent_rewards').insert({
+    family_id: familyId, user_id: userId, ...reward,
+  }).select().single()
+}
+export async function updateParentReward(id, fields) {
+  return await supabase.from('parent_rewards').update(fields).eq('id', id)
+}
+export async function deleteParentReward(id) {
+  return await supabase.from('parent_rewards').delete().eq('id', id)
+}
+
+/* Add a celebration entry to parent's history when they unlock + redeem a reward */
+export async function addParentClaim(familyId, userId, reward) {
+  return await supabase.from('parent_claims').insert({
+    family_id: familyId, user_id: userId,
+    reward_id: reward.id, reward_label: reward.label, reward_emoji: reward.emoji,
+  }).select().single()
+}
+
+/* List recent parent claims (for streak math + history view) */
+export async function getParentClaims(userId, limit = 30) {
+  return await supabase.from('parent_claims').select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false }).limit(limit)
+}
+
+/* ---- parent wins counters ----
+   Counts claims this parent has approved within the given window.
+   We attribute wins via `approver_user_id` going forward;
+   for historical claims (before the column existed), we fall back to
+   counting ALL approved claims in the family. That's fine for one-parent
+   families and decent enough for now. */
+export async function countWinsThisWeek(familyId, userId) {
+  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString()
+  // First, count claims attributed to this approver
+  const { count: attributed } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .gte('resolved_at', weekAgo)
+    .eq('approver_user_id', userId)
+  // Then count any approved claims with no approver attribution (legacy)
+  // — we'll attribute them to "the parent" by default.
+  const { count: legacy } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .gte('resolved_at', weekAgo)
+    .is('approver_user_id', null)
+  return (attributed || 0) + (legacy || 0)
+}
+
+/* Compute the current "approved 1+ per day" streak for a parent.
+   We pull resolved_at dates of approved claims and count consecutive
+   days ending today (or yesterday if today hasn't seen activity yet). */
+export async function getParentStreak(familyId, userId) {
+  // Pull last 60 days of approval timestamps for this family
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 864e5).toISOString()
+  const { data } = await supabase.from('claims')
+    .select('resolved_at, approver_user_id')
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .gte('resolved_at', sixtyDaysAgo)
+    .order('resolved_at', { ascending: false })
+  if (!data || data.length === 0) return 0
+
+  // Filter to this parent OR legacy (null approver) — same logic as wins counter
+  const myApprovals = data.filter(r =>
+    r.approver_user_id === userId || r.approver_user_id === null
+  )
+  if (myApprovals.length === 0) return 0
+
+  // Build a set of YYYY-MM-DD dates that had at least one approval
+  const dateSet = new Set(
+    myApprovals.map(r => r.resolved_at.slice(0, 10))
+  )
+
+  // Walk backward from today counting consecutive days
+  let streak = 0
+  let cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+  // If today has no approval yet, the streak doesn't break — allow up to "yesterday"
+  const today = cursor.toISOString().slice(0, 10)
+  if (!dateSet.has(today)) {
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  while (true) {
+    const key = cursor.toISOString().slice(0, 10)
+    if (dateSet.has(key)) {
+      streak++
+      cursor.setDate(cursor.getDate() - 1)
+    } else {
+      break
+    }
+  }
+  return streak
 }
 
 /* ---- file uploads ---- */
@@ -409,6 +519,10 @@ export function subscribeFamily(familyId, onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'decisions',
         filter: `family_id=eq.${familyId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rewards',
+        filter: `family_id=eq.${familyId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'parent_rewards',
+        filter: `family_id=eq.${familyId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'parent_claims',
         filter: `family_id=eq.${familyId}` }, onChange)
     .subscribe()
   return () => { supabase.removeChannel(ch) }

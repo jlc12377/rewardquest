@@ -908,6 +908,97 @@ export const S = {
     background: "var(--paper)", color: "var(--ink)",
   },
 
+  /* ===== Parent Me view — tagline, stats, reward shelf ===== */
+  parentTagline: {
+    fontFamily: "'Fraunces', serif", fontWeight: 300,
+    fontSize: 26, lineHeight: 1.2, letterSpacing: "-0.02em",
+    color: "var(--ink)", marginBottom: 22,
+    fontVariationSettings: "'opsz' 100",
+  },
+  parentTaglineItalic: {
+    fontStyle: "italic", color: "var(--accent)", fontWeight: 400,
+  },
+  parentStatRow: {
+    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14,
+    marginBottom: 20,
+  },
+  parentStatBig: {
+    background: "var(--paper)", border: "1px solid var(--hair)",
+    borderRadius: 4, padding: "16px 18px",
+  },
+  parentStatNum: {
+    fontFamily: "'Fraunces', serif", fontWeight: 400,
+    fontSize: 56, lineHeight: 0.95, letterSpacing: "-0.04em",
+    color: "var(--ink)", fontVariationSettings: "'opsz' 144",
+  },
+  parentStatLabel: {
+    fontSize: 10.5, fontWeight: 600, letterSpacing: 1.6,
+    textTransform: "uppercase", color: "var(--mute)",
+    marginTop: 4,
+  },
+  parentNextUnlock: {
+    display: "flex", alignItems: "center", gap: 14,
+    background: "var(--ink)", color: "#fff",
+    borderRadius: 4, padding: "16px 18px",
+    marginBottom: 24,
+  },
+  parentNextEmoji: {
+    fontSize: 32, lineHeight: 1, flexShrink: 0,
+  },
+  parentNextLabel: {
+    fontSize: 9.5, fontWeight: 700, letterSpacing: 1.6,
+    textTransform: "uppercase", color: "rgba(255,255,255,.6)",
+  },
+  parentNextTitle: {
+    fontFamily: "'Fraunces', serif", fontWeight: 400, fontSize: 18,
+    color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.1,
+    marginTop: 2,
+  },
+  parentNextHint: {
+    fontSize: 12, color: "var(--accent)", fontWeight: 600,
+    marginTop: 4,
+  },
+  parentRewardRow: {
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "12px 0", borderBottom: "1px solid var(--hair)",
+  },
+  parentRewardEmoji: {
+    width: 40, height: 40, borderRadius: 999,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 20, background: "var(--shelf)",
+    border: "1px solid var(--hair)", flexShrink: 0,
+  },
+  parentRewardLabel: {
+    fontSize: 14.5, fontWeight: 600, color: "var(--ink)",
+    letterSpacing: "-0.005em",
+  },
+  parentRewardMeta: {
+    fontSize: 12, color: "var(--mute)", marginTop: 2,
+  },
+  parentRedeemBtn: {
+    background: "var(--accent)",
+    color: "#ffffff", border: "none",
+    fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 11.5,
+    padding: "10px 16px", borderRadius: 999, letterSpacing: 0.5, textTransform: "uppercase",
+    flexShrink: 0, lineHeight: 1, whiteSpace: "nowrap", cursor: "pointer",
+  },
+  parentRedeemLocked: {
+    background: "transparent", border: "1px solid var(--hair)",
+    color: "var(--mute2)",
+  },
+  parentRewardCelebrated: {
+    display: "inline-flex", alignItems: "center", gap: 6,
+    fontSize: 11.5, fontWeight: 700, color: "var(--accent)",
+    textTransform: "uppercase", letterSpacing: 0.5,
+    padding: "10px 16px",
+  },
+  tierSelect: {
+    marginTop: 8, padding: "8px 12px",
+    border: "1px solid var(--hair)", borderRadius: 4,
+    background: "var(--paper)", color: "var(--ink)",
+    fontSize: 13, fontWeight: 500, outline: "none",
+  },
+
   /* ===== pending hero banner — parent dashboard ===== */
   pendingHero: {
     width: "100%", display: "flex", alignItems: "center", gap: 16,

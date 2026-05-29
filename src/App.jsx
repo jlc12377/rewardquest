@@ -13,6 +13,8 @@ import {
   getVideos, addVideo, getRedemptions, addRedemption, markRedemptionFulfilled,
   uploadProof, subscribeFamily,
   countApprovedClaims, countVideos, countRedemptions, countApprovedToday,
+  getParentRewards, addParentReward, updateParentReward, deleteParentReward,
+  addParentClaim, getParentClaims, countWinsThisWeek, getParentStreak,
 } from './data.js'
 import { supabase } from './supabase.js'
 import {
@@ -804,6 +806,9 @@ function ParentApp({ familyId, user }) {
   const [toast, setToast] = useState(null)
   const [family, setFamily] = useState(null)
   const [kids, setKids] = useState([])
+  /* viewMode: 'me' (parent's own dashboard) or 'kid' (looking at a kid's data).
+     activeKidId is which kid is active when in 'kid' mode. */
+  const [viewMode, setViewMode] = useState('kid')
   const [activeKidId, setActiveKidId] = useState(null)
   const [tasks, setTasks] = useState([])
   const [decisions, setDecisions] = useState([])
@@ -813,6 +818,11 @@ function ParentApp({ familyId, user }) {
   const [redemptions, setRedemptions] = useState([])
   const [recentClaims, setRecentClaims] = useState([])
   const [counts, setCounts] = useState({ weekPts: 0, weekClaims: 0, weekVideos: 0 })
+  /* Parent-specific state */
+  const [parentRewards, setParentRewards] = useState([])
+  const [parentClaims, setParentClaims] = useState([])
+  const [wins, setWins] = useState(0)
+  const [parentStreak, setParentStreak] = useState(0)
   const [confettiKey, setConfettiKey] = useState(0)
   const [pointsBump, setPointsBump] = useState(false)
 
@@ -868,7 +878,19 @@ function ParentApp({ familyId, user }) {
       weekClaims: (weekRows || []).length,
       weekVideos: (vidRows || []).length,
     })
-  }, [familyId, activeKidId])
+
+    /* Parent-specific data — wins, streak, rewards, claim history */
+    const [pr, pc, w, str] = await Promise.all([
+      getParentRewards(user.id),
+      getParentClaims(user.id, 30),
+      countWinsThisWeek(familyId, user.id),
+      getParentStreak(familyId, user.id),
+    ])
+    if (pr.data) setParentRewards(pr.data)
+    if (pc.data) setParentClaims(pc.data)
+    setWins(w || 0)
+    setParentStreak(str || 0)
+  }, [familyId, activeKidId, user.id])
 
   useEffect(() => { reload() }, [reload])
   useEffect(() => subscribeFamily(familyId, reload), [familyId, reload])
@@ -876,7 +898,7 @@ function ParentApp({ familyId, user }) {
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2600) }
 
   const onApprove = async (claim) => {
-    await resolveClaim(claim.id, 'approved')
+    await resolveClaim(claim.id, 'approved', user.id)
     // Determine which kid receives the points. Prefer the claim's own kid_id (most accurate);
     // fall back to active kid (one-kid families).
     const targetKidId = claim.kid_id || activeKidId
@@ -896,13 +918,46 @@ function ParentApp({ familyId, user }) {
     reload()
   }
   const onDecline = async (claim) => {
-    await resolveClaim(claim.id, 'declined')
+    await resolveClaim(claim.id, 'declined', user.id)
     flash('Declined')
     reload()
   }
   const onFulfill = async (id) => {
     await markRedemptionFulfilled(id)
     flash('Marked as given')
+    reload()
+  }
+
+  /* Parent celebrates an unlocked reward — logs to parent_claims for history. */
+  const onParentRedeem = async (reward) => {
+    if (wins < (reward.threshold || 0)) {
+      flash(`Need ${(reward.threshold || 0) - wins} more wins`)
+      return
+    }
+    await addParentClaim(familyId, user.id, reward)
+    flash(`Treat yourself ${reward.emoji || '✨'}`)
+    setConfettiKey(k => k + 1)
+    reload()
+  }
+  const onParentRewardSave = async (reward) => {
+    if (reward.id) {
+      await updateParentReward(reward.id, {
+        label: reward.label, emoji: reward.emoji,
+        threshold: reward.threshold, tier: reward.tier,
+      })
+    } else {
+      await addParentReward(familyId, user.id, {
+        label: reward.label, emoji: reward.emoji || '🌟',
+        threshold: reward.threshold || 5, tier: reward.tier || 'Daily',
+        sort_order: parentRewards.length + 1,
+      })
+    }
+    flash('Saved')
+    reload()
+  }
+  const onParentRewardDelete = async (id) => {
+    await deleteParentReward(id)
+    flash('Removed')
     reload()
   }
 
@@ -935,7 +990,12 @@ function ParentApp({ familyId, user }) {
     <div style={themedApp}>
       <ParentHeader family={familyForView} pointsBump={pointsBump} />
       <main style={S.main}>
-        <KidSwitcher kids={kids} activeKidId={activeKidId} setActiveKidId={setActiveKidId} reload={reload} />
+        <KidSwitcher
+          kids={kids}
+          viewMode={viewMode} setViewMode={setViewMode}
+          activeKidId={activeKidId} setActiveKidId={setActiveKidId}
+          reload={reload}
+        />
         <div style={S.modeRow}>
           <button onClick={() => setTab('home')}
             style={{ ...S.modeBtn, ...(tab === 'home' ? S.modeActive : {}) }}
@@ -965,7 +1025,16 @@ function ParentApp({ familyId, user }) {
           </button>
         </div>
 
-        {tab === 'home' && (
+        {tab === 'home' && viewMode === 'me' && (
+          <ParentMe
+            wins={wins} streak={parentStreak}
+            parentRewards={parentRewards}
+            parentClaims={parentClaims}
+            onRedeem={onParentRedeem}
+            setTab={setTab}
+          />
+        )}
+        {tab === 'home' && viewMode === 'kid' && (
           <ParentHome family={familyForView} pending={pending} videos={videos}
             rewards={rewards} redemptions={redemptions} recentClaims={recentClaims}
             counts={counts} setTab={setTab} />
@@ -977,7 +1046,14 @@ function ParentApp({ familyId, user }) {
         {tab === 'rewards' && (
           <ParentRewards redemptions={redemptions} onFulfill={onFulfill} />
         )}
-        {tab === 'edit' && (
+        {tab === 'edit' && viewMode === 'me' && (
+          <ParentMeEdit
+            parentRewards={parentRewards}
+            onSave={onParentRewardSave}
+            onDelete={onParentRewardDelete}
+          />
+        )}
+        {tab === 'edit' && viewMode === 'kid' && (
           <ParentEdit
             family={family}
             kids={kids} activeKidId={activeKidId}
@@ -1021,37 +1097,62 @@ function ParentHeader({ family, pointsBump }) {
   )
 }
 
-/* Kid switcher — appears at the top of the parent dashboard ONLY when there's
-   more than one kid in the family. For one-kid families, returns null so the UI
-   stays clean. Each chip shows avatar + first name + points; the active chip is
-   filled with the accent color. Long-press (or the small pencil) reveals a rename input. */
-function KidSwitcher({ kids, activeKidId, setActiveKidId, reload }) {
+/* Parent-side switcher: a row of chips that lets the parent toggle between
+   their own "Me" view (parent rewards, wins, streak) and each kid's view.
+   - Always shows the Me chip first.
+   - Shows each kid chip with avatar + name + points.
+   - Pencil-icon on each kid chip allows inline rename.
+   - Kids never see this — it only renders in ParentApp. */
+function KidSwitcher({ kids, viewMode, setViewMode, activeKidId, setActiveKidId, reload }) {
   const [renamingId, setRenamingId] = useState(null)
   const [draftName, setDraftName] = useState('')
 
-  // Hide entirely if there's just one kid (the common case for now)
-  if (!kids || kids.length < 2) return null
-
   const commitRename = async (kidId) => {
     const name = draftName.trim()
-    if (name) {
-      await updateKid(kidId, { name })
-    }
+    if (name) await updateKid(kidId, { name })
     setRenamingId(null)
     setDraftName('')
     reload()
   }
 
+  const isMeActive = viewMode === 'me'
+
   return (
     <div style={S.kidSwitchWrap}>
       <div style={S.kidSwitchLabel}>Viewing</div>
       <div style={S.kidSwitchRow}>
-        {kids.map((k) => {
-          const isActive = k.id === activeKidId
+        {/* Me chip — parent's own view */}
+        <div style={S.kidChip}>
+          <div style={{
+            ...S.kidChipBtn,
+            ...(isMeActive ? {
+              background: 'var(--accent)',
+              borderColor: 'var(--accent)',
+              color: '#fff',
+            } : {}),
+          }}>
+            <button
+              onClick={() => setViewMode('me')}
+              style={S.kidChipInner}
+              className="rq-press"
+              title="Your wins and rewards"
+            >
+              <span style={{
+                ...S.kidChipAvatar,
+                ...(isMeActive ? { background: 'rgba(255,255,255,0.18)' } : {}),
+              }}>✨</span>
+              <span style={S.kidChipName}>Me</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Kid chips */}
+        {(kids || []).map((k) => {
+          const isActive = viewMode === 'kid' && k.id === activeKidId
           const isRenaming = renamingId === k.id
           const displayName = (k.name && k.name !== 'Kid' && k.name !== 'My family') ? k.name : 'Kid'
           return (
-            <div key={k.id} style={{ ...S.kidChip, ...(isActive ? S.kidChipActive : {}) }}>
+            <div key={k.id} style={S.kidChip}>
               {isRenaming ? (
                 <input
                   autoFocus value={draftName} onChange={(e) => setDraftName(e.target.value)}
@@ -1069,7 +1170,7 @@ function KidSwitcher({ kids, activeKidId, setActiveKidId, reload }) {
                   } : {}),
                 }}>
                   <button
-                    onClick={() => setActiveKidId(k.id)}
+                    onClick={() => { setViewMode('kid'); setActiveKidId(k.id) }}
                     style={S.kidChipInner}
                     className="rq-press"
                     title="Tap to switch"
@@ -1106,6 +1207,192 @@ function KidSwitcher({ kids, activeKidId, setActiveKidId, reload }) {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   PARENT ME — the parent's own view: tagline, wins, streak,
+   reward shelf with threshold-based unlocks.
+   "Wins" = approvals attributed to this parent in the past 7 days.
+   Rewards UNLOCK at threshold but don't deduct wins (recurring weekly).
+   ============================================================ */
+function ParentMe({ wins, streak, parentRewards, parentClaims, onRedeem, setTab }) {
+  /* Group rewards by tier for visual hierarchy */
+  const byTier = { Daily: [], Weekly: [], Monthly: [] }
+  ;(parentRewards || []).forEach(r => {
+    const t = r.tier || 'Daily'
+    if (!byTier[t]) byTier[t] = []
+    byTier[t].push(r)
+  })
+
+  /* Track which rewards have been celebrated in the past 7 days (the "claimed" set) */
+  const sevenDaysAgo = Date.now() - 7 * 864e5
+  const claimedRecentIds = new Set(
+    (parentClaims || [])
+      .filter(c => new Date(c.created_at).getTime() > sevenDaysAgo && c.reward_id)
+      .map(c => c.reward_id)
+  )
+
+  /* Find the closest next unlock for the inspirational stat at the top */
+  const sortedByGap = [...(parentRewards || [])]
+    .filter(r => wins < r.threshold)
+    .sort((a, b) => (a.threshold - wins) - (b.threshold - wins))
+  const nextUnlock = sortedByGap[0]
+
+  return (
+    <div className="rq-fade">
+      {/* Tagline */}
+      <div style={S.parentTagline}>
+        It's the <em style={S.parentTaglineItalic}>little wins</em> that matter.
+      </div>
+
+      {/* Wins + streak stat block */}
+      <div style={S.parentStatRow}>
+        <div style={S.parentStatBig}>
+          <div style={S.parentStatNum}>{wins}</div>
+          <div style={S.parentStatLabel}>wins this week</div>
+        </div>
+        <div style={S.parentStatBig}>
+          <div style={S.parentStatNum}>{streak}</div>
+          <div style={S.parentStatLabel}>day streak</div>
+        </div>
+      </div>
+
+      {nextUnlock && (
+        <div style={S.parentNextUnlock}>
+          <span style={S.parentNextEmoji}>{nextUnlock.emoji || '🌟'}</span>
+          <div style={{ flex: 1 }}>
+            <div style={S.parentNextLabel}>Next unlock</div>
+            <div style={S.parentNextTitle}>{nextUnlock.label}</div>
+            <div style={S.parentNextHint}>
+              {nextUnlock.threshold - wins} more {nextUnlock.threshold - wins === 1 ? 'win' : 'wins'} to go
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reward shelves, grouped by tier */}
+      {['Daily', 'Weekly', 'Monthly'].map(tier => {
+        const items = byTier[tier] || []
+        if (items.length === 0) return null
+        return (
+          <div key={tier} style={{ marginBottom: 22 }}>
+            <div style={S.sectionTag}>
+              <span style={{ ...S.tierDot, background: 'var(--accent)' }} />
+              {tier}
+            </div>
+            {items.map(r => {
+              const unlocked = wins >= r.threshold
+              const celebrated = claimedRecentIds.has(r.id)
+              return (
+                <div key={r.id} style={S.parentRewardRow}>
+                  <span style={S.parentRewardEmoji}>{r.emoji || '🌟'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.parentRewardLabel}>{r.label}</div>
+                    <div style={S.parentRewardMeta}>{r.threshold} wins</div>
+                  </div>
+                  {celebrated ? (
+                    <span style={S.parentRewardCelebrated}>
+                      <Check size={14} /> Treated
+                    </span>
+                  ) : (
+                    <button onClick={() => onRedeem(r)} disabled={!unlocked}
+                      style={{ ...S.parentRedeemBtn, ...(unlocked ? {} : S.parentRedeemLocked) }}
+                      className="rq-press">
+                      {unlocked ? <span style={{ color: '#fff' }}>Treat me</span> : <Lock size={13} />}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+
+      <button onClick={() => setTab('edit')} style={{ ...S.shortcutBright, marginTop: 4, marginBottom: 14 }} className="rq-press">
+        <div style={S.shortcutBrightIcon}><Pencil size={20} style={{ color: '#fff' }} /></div>
+        <div style={{ flex: 1, textAlign: 'left' }}>
+          <div style={S.shortcutTitle}>Edit my rewards</div>
+          <div style={S.shortcutSub}>Customize your treat list</div>
+        </div>
+        <ChevronRight size={20} style={{ color: 'var(--accent)' }} />
+      </button>
+    </div>
+  )
+}
+
+/* Parent reward editor — appears in Edit tab when in Me mode. */
+function ParentMeEdit({ parentRewards, onSave, onDelete }) {
+  const [label, setLabel] = useState('')
+  const [emoji, setEmoji] = useState('🌟')
+  const [threshold, setThreshold] = useState(5)
+  const [tier, setTier] = useState('Daily')
+  const [editingId, setEditingId] = useState(null)
+  const [draft, setDraft] = useState({})
+
+  const add = async () => {
+    const text = label.trim()
+    if (!text) return
+    await onSave({ label: text, emoji, threshold: parseInt(threshold, 10) || 5, tier })
+    setLabel(''); setEmoji('🌟'); setThreshold(5); setTier('Daily')
+  }
+  const beginEdit = (r) => { setEditingId(r.id); setDraft({ ...r }) }
+  const commitEdit = async () => {
+    if (!draft.label || !draft.label.trim()) return
+    await onSave({ id: editingId, ...draft, threshold: parseInt(draft.threshold, 10) || 5 })
+    setEditingId(null)
+  }
+
+  return (
+    <div className="rq-fade">
+      <h2 style={S.h2}>My rewards</h2>
+      <p style={S.sectionHint}>Pick the little wins that motivate you. Set the threshold — that's how many approvals it takes to unlock that reward each week.</p>
+
+      {parentRewards.map(r => editingId === r.id ? (
+        <div key={r.id} style={S.editRow}>
+          <input value={draft.emoji} onChange={(e) => setDraft({ ...draft, emoji: e.target.value })}
+            style={{ ...S.editInput, width: 50, textAlign: 'center' }} />
+          <input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+            style={S.editInput} placeholder="Reward" />
+          <input value={draft.threshold} onChange={(e) => setDraft({ ...draft, threshold: e.target.value })}
+            style={S.editPts} type="number" inputMode="numeric" />
+          <button onClick={commitEdit} style={S.iconBtnGo} className="rq-press">
+            <Check size={15} />
+          </button>
+        </div>
+      ) : (
+        <div key={r.id} style={S.parentRewardRow}>
+          <span style={S.parentRewardEmoji}>{r.emoji || '🌟'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={S.parentRewardLabel}>{r.label}</div>
+            <div style={S.parentRewardMeta}>{r.tier} · {r.threshold} wins</div>
+          </div>
+          <button onClick={() => beginEdit(r)} style={S.iconBtnEdit} className="rq-press" aria-label="Edit">
+            <Pencil size={14} />
+          </button>
+          <button onClick={() => onDelete(r.id)} style={S.iconBtnDel} className="rq-press" aria-label="Delete">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+
+      <div style={{ ...S.editRow, marginTop: 14 }}>
+        <input value={emoji} onChange={(e) => setEmoji(e.target.value)}
+          style={{ ...S.editInput, width: 50, textAlign: 'center' }} placeholder="🌟" />
+        <input value={label} onChange={(e) => setLabel(e.target.value)}
+          style={S.editInput} placeholder="New reward" />
+        <input value={threshold} onChange={(e) => setThreshold(e.target.value)}
+          style={S.editPts} type="number" inputMode="numeric" placeholder="5" />
+        <button onClick={add} style={S.iconBtnGo} className="rq-press" aria-label="Add">
+          <Plus size={15} />
+        </button>
+      </div>
+      <select value={tier} onChange={(e) => setTier(e.target.value)} style={S.tierSelect}>
+        <option value="Daily">Daily</option>
+        <option value="Weekly">Weekly</option>
+        <option value="Monthly">Monthly</option>
+      </select>
     </div>
   )
 }
