@@ -46,7 +46,7 @@ export default function App() {
     (async () => {
       const res = await joinOrCreateFamily(session.user)
       if (res.error) { setBootErr(res.error.message || 'Could not load family'); return }
-      setBootstrap({ familyId: res.familyId, role: res.role })
+      setBootstrap({ familyId: res.familyId, role: res.role, kidId: res.kidId })
     })()
   }, [session])
 
@@ -60,7 +60,7 @@ export default function App() {
       <style>{CSS}</style>
       {bootstrap.role === 'parent'
         ? <ParentApp familyId={bootstrap.familyId} user={session.user} />
-        : <KidApp familyId={bootstrap.familyId} user={session.user} />}
+        : <KidApp familyId={bootstrap.familyId} kidId={bootstrap.kidId} user={session.user} />}
     </>
   )
 }
@@ -265,7 +265,7 @@ function AppHeader({ family, role, onSignOut }) {
 /* ============================================================
    KID APP
    ============================================================ */
-function KidApp({ familyId, user }) {
+function KidApp({ familyId, kidId, user }) {
   const [tab, setTab] = useState('home')
   const [toast, setToast] = useState(null)
   const [family, setFamily] = useState(null)

@@ -6,11 +6,33 @@ import { supabase } from './supabase.js'
 
 /* ---- auth ---- */
 export async function signUp(email, password, inviteCode) {
-  const opts = {}
+  // If a family code was provided, validate it BEFORE creating the auth user.
+  // This prevents the "orphan account" bug where a typo'd code would still
+  // create the Supabase user but leave them unlinked to any family.
   if (inviteCode) {
-    opts.data = { pending_invite_code: inviteCode.trim().toUpperCase() }
+    const cleanCode = inviteCode.trim().toUpperCase()
+    const { data: famRow, error: lookupErr } = await supabase
+      .from('families')
+      .select('id')
+      .eq('invite_code', cleanCode)
+      .maybeSingle()
+    if (lookupErr) {
+      return { data: null, error: { message: `Couldn't check that code: ${lookupErr.message}` } }
+    }
+    if (!famRow) {
+      return {
+        data: null,
+        error: { message: `Family code "${cleanCode}" not found. Ask the parent to double-check the code in their app.` },
+      }
+    }
+    // Code is valid — proceed to create the auth user, stashing the validated code
+    return await supabase.auth.signUp({
+      email, password,
+      options: { data: { pending_invite_code: cleanCode } },
+    })
   }
-  return await supabase.auth.signUp({ email, password, options: opts })
+  // No invite code → starting a new family as a parent
+  return await supabase.auth.signUp({ email, password })
 }
 export async function signIn(email, password) {
   return await supabase.auth.signInWithPassword({ email, password })
@@ -62,45 +84,73 @@ function generateInviteCode() {
   return 'RQ-' + code
 }
 
+/* Phase 3: Returns { familyId, role, kidId, error }.
+   - For parents: kidId is null (parents don't have a kid record of their own).
+   - For kids: kidId is the row in the `kids` table that holds their points etc.
+   - For new kid signups: if the family was migrated and has a placeholder
+     empty kid (0 points, no name set), we re-use it instead of creating a duplicate.
+     For any subsequent kid in the same family, we create a fresh kid row.
+*/
 export async function joinOrCreateFamily(user) {
-  // already linked via metadata? Use that.
-  const existing = user.user_metadata && user.user_metadata.family_id
-  if (existing) {
-    // double-check the family still exists (paranoia)
-    const { data: famRow } = await supabase.from('families').select('id').eq('id', existing).maybeSingle()
+  const meta = user.user_metadata || {}
+  const existingFamilyId = meta.family_id
+  const existingRole = meta.role
+  const existingKidId = meta.kid_id
+
+  // Path 1: User is already linked AND has a kid_id (or is parent). Just verify and use.
+  if (existingFamilyId && existingRole) {
+    const { data: famRow } = await supabase.from('families').select('id').eq('id', existingFamilyId).maybeSingle()
     if (famRow) {
-      return { familyId: existing, role: user.user_metadata.role || 'parent', error: null }
+      // For parents, kidId is null and that's fine
+      if (existingRole === 'parent') {
+        return { familyId: existingFamilyId, role: 'parent', kidId: null, error: null }
+      }
+      // For kids: if we have a kid_id, verify it still exists
+      if (existingKidId) {
+        const { data: kidRow } = await supabase.from('kids').select('id').eq('id', existingKidId).maybeSingle()
+        if (kidRow) {
+          return { familyId: existingFamilyId, role: 'kid', kidId: existingKidId, error: null }
+        }
+        // Kid record was deleted — fall through to claim a new one
+      }
+      // Kid linked to family but no kid_id yet (migrated user) — find or claim a kid row
+      const kidId = await claimKidRowForUser(existingFamilyId)
+      if (kidId) {
+        await supabase.auth.updateUser({ data: { ...meta, kid_id: kidId } })
+        return { familyId: existingFamilyId, role: 'kid', kidId, error: null }
+      }
     }
-    // Family was deleted — fall through and create a new one
+    // Family was deleted — fall through and create new
   }
 
-  // Did this user sign up with a pending invite code?
-  const pendingCode = user.user_metadata && user.user_metadata.pending_invite_code
+  // Path 2: User has a pending invite code → join as kid
+  const pendingCode = meta.pending_invite_code
   if (pendingCode) {
     const { data: famRow, error: lookupErr } = await supabase
-      .from('families')
-      .select('id')
-      .eq('invite_code', pendingCode)
-      .maybeSingle()
+      .from('families').select('id').eq('invite_code', pendingCode).maybeSingle()
 
-    if (lookupErr) return { familyId: null, role: null, error: lookupErr }
+    if (lookupErr) return { familyId: null, role: null, kidId: null, error: lookupErr }
     if (!famRow) {
       return {
-        familyId: null,
-        role: null,
-        error: { message: `Family code "${pendingCode}" not found. Ask the parent to double-check the code in their app.` },
+        familyId: null, role: null, kidId: null,
+        error: { message: `Family code "${pendingCode}" not found. Sign out and try again with the correct code.` },
       }
     }
 
-    // Link this user as a kid in that family
+    // Claim a kid row (re-use placeholder if available, else create fresh)
+    const kidId = await claimKidRowForUser(famRow.id)
+    if (!kidId) {
+      return { familyId: null, role: null, kidId: null, error: { message: 'Could not create kid record.' } }
+    }
+
     const { error: updErr } = await supabase.auth.updateUser({
-      data: { family_id: famRow.id, role: 'kid', pending_invite_code: null },
+      data: { family_id: famRow.id, role: 'kid', kid_id: kidId, pending_invite_code: null },
     })
-    if (updErr) return { familyId: null, role: null, error: updErr }
-    return { familyId: famRow.id, role: 'kid', error: null }
+    if (updErr) return { familyId: null, role: null, kidId: null, error: updErr }
+    return { familyId: famRow.id, role: 'kid', kidId, error: null }
   }
 
-  // No metadata, no invite code → create a new family with this user as the parent
+  // Path 3: No metadata, no code → create new family as parent
   const inviteCode = generateInviteCode()
   const { data: famRow, error: createErr } = await supabase
     .from('families')
@@ -111,9 +161,11 @@ export async function joinOrCreateFamily(user) {
       invite_code: inviteCode,
     })
     .select().single()
-  if (createErr) return { familyId: null, role: null, error: createErr }
+  if (createErr) return { familyId: null, role: null, kidId: null, error: createErr }
   const familyId = famRow.id
 
+  // Seed defaults (without kid_id — these are family-level defaults that get claimed
+  // by the first kid via claimKidRowForUser, which also reassigns them).
   await supabase.from('tasks').insert(DEFAULT_TASKS.map(t => ({ ...t, family_id: familyId })))
   await supabase.from('decisions').insert(DEFAULT_DECISIONS.map(d => ({ ...d, family_id: familyId })))
   await supabase.from('rewards').insert(DEFAULT_REWARDS.map(r => ({ ...r, family_id: familyId })))
@@ -121,8 +173,58 @@ export async function joinOrCreateFamily(user) {
   const { error: updErr } = await supabase.auth.updateUser({
     data: { family_id: familyId, role: 'parent' },
   })
-  if (updErr) return { familyId: null, role: null, error: updErr }
-  return { familyId, role: 'parent', error: null }
+  if (updErr) return { familyId: null, role: null, kidId: null, error: updErr }
+  return { familyId, role: 'parent', kidId: null, error: null }
+}
+
+/* Claim a kid row in a family for the current signing-up user.
+   Strategy:
+   1. If the family has an "empty placeholder" kid (0 lifetime pts, no claims/videos
+      attached to it), re-use it. This covers migrated families where the auto-created
+      placeholder is waiting for the real kid.
+   2. Otherwise, create a new fresh kid row and link existing unassigned data to it
+      (but only if no other kid in the family is using that data already).
+
+   Returns the kid_id, or null on failure.
+*/
+async function claimKidRowForUser(familyId) {
+  // Look for a placeholder: kid in this family with 0 lifetime pts and no claims/videos
+  const { data: candidates } = await supabase.from('kids')
+    .select('id, lifetime_points')
+    .eq('family_id', familyId)
+    .order('created_at', { ascending: true })
+
+  if (candidates && candidates.length > 0) {
+    // Find the first candidate that's truly empty (no claims, no videos attached)
+    for (const k of candidates) {
+      const { count: claimCount } = await supabase.from('claims')
+        .select('*', { count: 'exact', head: true })
+        .eq('kid_id', k.id)
+      const { count: videoCount } = await supabase.from('videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('kid_id', k.id)
+      if ((claimCount || 0) === 0 && (videoCount || 0) === 0 && (k.lifetime_points || 0) === 0) {
+        return k.id
+      }
+    }
+  }
+
+  // No placeholder available → create a fresh kid row
+  const { data: newKid, error } = await supabase.from('kids')
+    .insert({
+      family_id: familyId,
+      name: 'Kid',
+      avatar_emoji: '✨',
+      theme: 'magenta',
+      points: 0, lifetime_points: 0, streak: 1,
+      last_active: new Date().toISOString().slice(0, 10),
+    })
+    .select().single()
+  if (error) {
+    console.error('Failed to create kid row:', error)
+    return null
+  }
+  return newKid.id
 }
 
 /* ---- family snapshot ---- */
