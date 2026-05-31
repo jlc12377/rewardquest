@@ -15,6 +15,8 @@ import {
   countApprovedClaims, countVideos, countRedemptions, countApprovedToday,
   getParentRewards, addParentReward, updateParentReward, deleteParentReward,
   addParentClaim, getParentClaims, countWinsThisWeek, getParentStreak,
+  getLevelUpStatus, getLevelUpStatusForKid, awardLevelUpBonus, applyKidBonusPoints,
+  LEVELUP_KID_POINTS_GOAL, LEVELUP_PARENT_WINS_GOAL, LEVELUP_STREAK_GOAL,
 } from './data.js'
 import { supabase } from './supabase.js'
 import {
@@ -138,7 +140,7 @@ function AuthScreen() {
       <style>{CSS}</style>
       <div style={S.authWrap} className="rq-fade">
         <div style={S.authBrand}>
-          <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
+          <span style={S.brandWord}><span style={S.brandMy}>my</span>reward<span style={S.brandDot}></span>quest</span>
         </div>
         <h1 style={S.authH1}>
           {mode === 'signup'
@@ -288,7 +290,7 @@ function AppHeader({ family, role, onSignOut }) {
       <div>
         <div style={S.brand}>
           <Sparkles size={20} style={{ color: 'var(--accent)' }} />
-          <span style={S.brandWord}>RewardQuest</span>
+          <span style={S.brandWord}><span style={S.brandMy}>my</span>RewardQuest</span>
         </div>
         <div style={S.whoami}>
           <Heart size={12} style={{ color: 'var(--accent)' }} />
@@ -323,6 +325,7 @@ function KidApp({ familyId, kidId, user }) {
   const [confettiKey, setConfettiKey] = useState(0)
   const [pointsBump, setPointsBump] = useState(false)
   const [badgePop, setBadgePop] = useState(null)
+  const [kidLevelUpStatus, setKidLevelUpStatus] = useState(null)
   const seenBadgesRef = useRef(null)
   const lastPointsRef = useRef(null)
 
@@ -352,6 +355,10 @@ function KidApp({ familyId, kidId, user }) {
       approved: ca.count || 0, chores: cc.count || 0,
       videos: cv.count || 0, redemptions: cr.count || 0, today: ct.count || 0,
     })
+    if (kidId && k.data) {
+      const luStatus = await getLevelUpStatusForKid(familyId, kidId, k.data.streak || 0)
+      setKidLevelUpStatus(luStatus)
+    }
   }, [familyId, kidId])
 
   useEffect(() => { reload() }, [reload])
@@ -452,7 +459,8 @@ function KidApp({ familyId, kidId, user }) {
       <main style={S.main}>
         {tab === 'home' && (
           <KidHome family={kid} rewards={rewards} pending={pending}
-            counts={counts} setTab={setTab} />
+            counts={counts} setTab={setTab}
+            levelUpStatus={kidLevelUpStatus} />
         )}
         {tab === 'tasks' && (
           <KidTasks family={kid} tasks={tasks} decisions={decisions}
@@ -461,6 +469,12 @@ function KidApp({ familyId, kidId, user }) {
         {tab === 'video' && <KidVideo onSave={onSaveVideo} videos={videos} family={kid} />}
         {tab === 'store' && <KidStore family={kid} rewards={rewards} onRedeem={onRedeem} />}
         {tab === 'me'    && <KidMe family={kid} onSave={onSavePersonalize} />}
+
+        <div style={S.appFooter}>
+          <a href="/privacy.html" target="_blank" rel="noopener" style={S.appFooterLink}>
+            Privacy Policy
+          </a>
+        </div>
       </main>
 
       {toast && <div style={S.toast} className="rq-toast">{toast}</div>}
@@ -488,7 +502,7 @@ function KidHeader({ family, pointsBump }) {
         <div style={S.avatarChip}>{avatar}</div>
         <div>
           <div style={S.brand}>
-            <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
+            <span style={S.brandWord}><span style={S.brandMy}>my</span>reward<span style={S.brandDot}></span>quest</span>
           </div>
           <div style={S.whoami}>
             <span style={S.miniStreakChip}>{streak}-day streak</span>
@@ -503,7 +517,7 @@ function KidHeader({ family, pointsBump }) {
   )
 }
 
-function KidHome({ family, rewards, pending, counts, setTab }) {
+function KidHome({ family, rewards, pending, counts, setTab, levelUpStatus }) {
   const sorted = [...rewards].sort((a, b) => a.cost - b.cost)
   const next = sorted.find((r) => r.cost > (family.points || 0)) || sorted[sorted.length - 1]
   const pct = next ? Math.min(100, Math.round((family.points / next.cost) * 100)) : 0
@@ -584,6 +598,8 @@ function KidHome({ family, rewards, pending, counts, setTab }) {
           <div style={S.statLabel}>Streak</div>
         </div>
       </div>
+
+      <LevelUpCard status={levelUpStatus} kidName={firstName} viewMode="kid" />
 
       <div style={S.eyebrow}>
         <span style={S.eyebrowNum}>01</span>
@@ -862,6 +878,9 @@ function ParentApp({ familyId, user }) {
   const [parentClaims, setParentClaims] = useState([])
   const [wins, setWins] = useState(0)
   const [parentStreak, setParentStreak] = useState(0)
+  /* Level Up Together — shared bonus mechanic. Status is recomputed on each reload. */
+  const [levelUpStatus, setLevelUpStatus] = useState(null)
+  const [levelUpJustWon, setLevelUpJustWon] = useState(false)
   const [confettiKey, setConfettiKey] = useState(0)
   const [pointsBump, setPointsBump] = useState(false)
 
@@ -929,6 +948,28 @@ function ParentApp({ familyId, user }) {
     if (pc.data) setParentClaims(pc.data)
     setWins(w || 0)
     setParentStreak(str || 0)
+
+    /* Level Up Together — check shared status. If both sides have hit eligibility
+       this week AND we haven't already awarded the bonus, award it now and apply
+       the kid's bonus points. The parent's bonus is acknowledgment-only (no
+       wins-currency decrement, just a visible badge). */
+    if (curKid) {
+      const activeKidObj = ks.data?.find(k => k.id === curKid)
+      const luStatus = await getLevelUpStatus(familyId, curKid, user.id, activeKidObj?.streak || 0)
+      if (luStatus.eligible && !luStatus.alreadyAwarded) {
+        const trigger = luStatus.thresholdsMet ? 'thresholds' : 'streaks'
+        const awarded = await awardLevelUpBonus(familyId, curKid, user.id, trigger)
+        if (awarded) {
+          await applyKidBonusPoints(curKid, awarded.kid_bonus_points)
+          luStatus.alreadyAwarded = true
+          luStatus.awardedBonus = awarded
+          setLevelUpJustWon(true)
+          setConfettiKey(k => k + 1)
+          setTimeout(() => setLevelUpJustWon(false), 5000)
+        }
+      }
+      setLevelUpStatus(luStatus)
+    }
   }, [familyId, activeKidId, user.id])
 
   useEffect(() => { reload() }, [reload])
@@ -1001,9 +1042,9 @@ function ParentApp({ familyId, user }) {
   }
 
   /* Update browser/PWA tab title to reflect pending count — like Gmail does.
-     When the app is in the iOS app switcher, this shows "(3) reward·quest". */
+     When the app is in the iOS app switcher, this shows "(3) my reward·quest". */
   useEffect(() => {
-    const base = 'reward·quest'
+    const base = 'my reward·quest'
     document.title = pending.length > 0 ? `(${pending.length}) ${base}` : base
     return () => { document.title = base }
   }, [pending.length])
@@ -1071,6 +1112,8 @@ function ParentApp({ familyId, user }) {
             parentClaims={parentClaims}
             onRedeem={onParentRedeem}
             setTab={setTab}
+            levelUpStatus={levelUpStatus}
+            activeKid={activeKid}
           />
         )}
         {tab === 'home' && viewMode === 'kid' && (
@@ -1105,6 +1148,11 @@ function ParentApp({ familyId, user }) {
         <button onClick={signOut} style={S.signOutBtn} className="rq-press">
           <LogOut size={14} /> Sign out ({user.email})
         </button>
+        <div style={S.appFooter}>
+          <a href="/privacy.html" target="_blank" rel="noopener" style={S.appFooterLink}>
+            Privacy Policy
+          </a>
+        </div>
       </main>
       {toast && <div style={S.toast} className="rq-toast">{toast}</div>}
       {confettiKey > 0 && <Confetti k={confettiKey} themeGold={theme.accent} />}
@@ -1121,7 +1169,7 @@ function ParentHeader({ family, pointsBump }) {
         <div style={S.avatarChip}>{avatar}</div>
         <div>
           <div style={S.brand}>
-            <span style={S.brandWord}>reward<span style={S.brandDot}></span>quest</span>
+            <span style={S.brandWord}><span style={S.brandMy}>my</span>reward<span style={S.brandDot}></span>quest</span>
           </div>
           <div style={S.whoami}>
             <span>Parent</span>
@@ -1256,7 +1304,99 @@ function KidSwitcher({ kids, viewMode, setViewMode, activeKidId, setActiveKidId,
    "Wins" = approvals attributed to this parent in the past 7 days.
    Rewards UNLOCK at threshold but don't deduct wins (recurring weekly).
    ============================================================ */
-function ParentMe({ wins, streak, parentRewards, parentClaims, onRedeem, setTab }) {
+/* ============================================================
+   LEVEL UP TOGETHER — shared card showing weekly progress
+   for kid and parent, with bonus celebration when earned.
+   Used on both the kid's home and the parent's Me view.
+   ============================================================ */
+function LevelUpCard({ status, kidName, viewMode }) {
+  if (!status) return null
+
+  const kidPct = Math.min(100, Math.round((status.kidPts / status.kidGoal) * 100))
+  const parentPct = Math.min(100, Math.round((status.parentWins / status.parentGoal) * 100))
+  const kidStreakPct = Math.min(100, Math.round((status.kidStreak / status.streakGoal) * 100))
+  const parentStreakPct = Math.min(100, Math.round((status.parentStreak / status.streakGoal) * 100))
+
+  const kidLabel = kidName || 'Your kid'
+  const youLabel = viewMode === 'kid' ? 'Mom' : 'You'   // when kid is viewing, refer to parent as Mom
+
+  if (status.alreadyAwarded) {
+    return (
+      <div style={S.levelupCardWon}>
+        <div style={S.levelupKicker}>
+          <span style={{ ...S.levelupDot, background: '#fff' }} />
+          Level Up Together — Won this week
+        </div>
+        <div style={S.levelupWonBig}>
+          You both did it. <em style={S.levelupWonItalic}>Together.</em>
+        </div>
+        <div style={S.levelupWonSub}>
+          +{status.awardedBonus?.kid_bonus_points || 50} pts to {kidLabel} ·
+          +{status.awardedBonus?.parent_bonus_wins || 5} wins to {youLabel}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={S.levelupCard}>
+      <div style={S.levelupKicker}>
+        <span style={S.levelupDot} />
+        Level Up Together
+      </div>
+      <div style={S.levelupTitle}>
+        We win <em style={S.levelupTitleItalic}>together.</em>
+      </div>
+      <div style={S.levelupHint}>
+        Hit either set of goals this week as a team. Both of you get a bonus.
+      </div>
+
+      {/* Trigger A — points + wins */}
+      <div style={S.levelupTriggerWrap}>
+        <div style={S.levelupTriggerLabel}>WEEKLY GOALS</div>
+        <div style={S.levelupRow}>
+          <div style={S.levelupRowLabel}>{kidLabel}</div>
+          <div style={S.levelupBarTrack}>
+            <div style={{ ...S.levelupBarFill, width: `${kidPct}%` }} />
+          </div>
+          <div style={S.levelupRowNum}>{status.kidPts}/{status.kidGoal} pts</div>
+        </div>
+        <div style={S.levelupRow}>
+          <div style={S.levelupRowLabel}>{youLabel}</div>
+          <div style={S.levelupBarTrack}>
+            <div style={{ ...S.levelupBarFill, width: `${parentPct}%` }} />
+          </div>
+          <div style={S.levelupRowNum}>{status.parentWins}/{status.parentGoal} wins</div>
+        </div>
+      </div>
+
+      {/* Trigger B — streaks */}
+      <div style={S.levelupTriggerWrap}>
+        <div style={S.levelupTriggerLabel}>WEEKLY STREAKS</div>
+        <div style={S.levelupRow}>
+          <div style={S.levelupRowLabel}>{kidLabel}</div>
+          <div style={S.levelupBarTrack}>
+            <div style={{ ...S.levelupBarFill, width: `${kidStreakPct}%` }} />
+          </div>
+          <div style={S.levelupRowNum}>{status.kidStreak}/{status.streakGoal} days</div>
+        </div>
+        <div style={S.levelupRow}>
+          <div style={S.levelupRowLabel}>{youLabel}</div>
+          <div style={S.levelupBarTrack}>
+            <div style={{ ...S.levelupBarFill, width: `${parentStreakPct}%` }} />
+          </div>
+          <div style={S.levelupRowNum}>{status.parentStreak}/{status.streakGoal} days</div>
+        </div>
+      </div>
+
+      <div style={S.levelupReward}>
+        🎁 +{status.kidBonus} pts for {kidLabel} · +{status.parentBonus} wins for {youLabel}
+      </div>
+    </div>
+  )
+}
+
+function ParentMe({ wins, streak, parentRewards, parentClaims, onRedeem, setTab, levelUpStatus, activeKid }) {
   /* Group rewards by tier for visual hierarchy */
   const byTier = { Daily: [], Weekly: [], Monthly: [] }
   ;(parentRewards || []).forEach(r => {
@@ -1279,6 +1419,9 @@ function ParentMe({ wins, streak, parentRewards, parentClaims, onRedeem, setTab 
     .sort((a, b) => (a.threshold - wins) - (b.threshold - wins))
   const nextUnlock = sortedByGap[0]
 
+  const kidDisplayName = (activeKid && activeKid.name && activeKid.name !== 'Kid' && activeKid.name !== 'My family')
+    ? activeKid.name : 'Kid'
+
   return (
     <div className="rq-fade">
       {/* Tagline */}
@@ -1297,6 +1440,9 @@ function ParentMe({ wins, streak, parentRewards, parentClaims, onRedeem, setTab 
           <div style={S.parentStatLabel}>day streak</div>
         </div>
       </div>
+
+      {/* Level Up Together card — shared bonus mechanic */}
+      <LevelUpCard status={levelUpStatus} kidName={kidDisplayName} viewMode="me" />
 
       {nextUnlock && (
         <div style={S.parentNextUnlock}>

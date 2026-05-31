@@ -310,6 +310,203 @@ export async function deleteRow(table, id) {
   return await supabase.from(table).delete().eq('id', id)
 }
 
+/* ============================================================
+   LEVEL UP TOGETHER — shared weekly bonus mechanic
+   Bonus fires when BOTH conditions are met the same week:
+     Trigger A — kid hits weekly points goal AND parent hits wins goal
+     Trigger B — kid AND parent each hit a 7-day streak this week
+   Either trigger satisfies; we record which.
+   ============================================================ */
+
+/* Configurable defaults — could be promoted to per-family later */
+export const LEVELUP_KID_POINTS_GOAL = 100
+export const LEVELUP_PARENT_WINS_GOAL = 7
+export const LEVELUP_STREAK_GOAL = 7
+export const LEVELUP_KID_BONUS = 50
+export const LEVELUP_PARENT_BONUS = 5
+
+/* Compute Monday-of-this-week as YYYY-MM-DD (local time) */
+export function getWeekStarting(d = new Date()) {
+  const date = new Date(d)
+  date.setHours(0, 0, 0, 0)
+  const day = date.getDay()  // 0 = Sunday, 1 = Monday, ...
+  const diff = day === 0 ? -6 : 1 - day  // back up to most recent Monday
+  date.setDate(date.getDate() + diff)
+  return date.toISOString().slice(0, 10)
+}
+
+/* Sum a kid's approved points for the current week. */
+export async function kidPointsThisWeek(familyId, kidId) {
+  const monday = getWeekStarting()
+  const mondayISO = new Date(monday + 'T00:00:00').toISOString()
+  const { data } = await supabase.from('claims')
+    .select('points')
+    .eq('family_id', familyId)
+    .eq('kid_id', kidId)
+    .eq('status', 'approved')
+    .gte('resolved_at', mondayISO)
+  return (data || []).reduce((s, r) => s + (r.points || 0), 0)
+}
+
+/* Check if a level-up bonus was already awarded this week for this family+kid+parent. */
+export async function getLevelUpBonusThisWeek(familyId, kidId, userId) {
+  const monday = getWeekStarting()
+  const { data } = await supabase.from('level_up_bonuses')
+    .select('*')
+    .eq('family_id', familyId)
+    .eq('kid_id', kidId)
+    .eq('user_id', userId)
+    .eq('week_starting', monday)
+    .maybeSingle()
+  return data || null
+}
+
+/* Award the bonus for this week.
+   Returns the inserted row, or null if already awarded (idempotent). */
+export async function awardLevelUpBonus(familyId, kidId, userId, triggerKind) {
+  const monday = getWeekStarting()
+  const { data, error } = await supabase.from('level_up_bonuses').insert({
+    family_id: familyId,
+    kid_id: kidId,
+    user_id: userId,
+    week_starting: monday,
+    trigger_kind: triggerKind,
+    kid_bonus_points: LEVELUP_KID_BONUS,
+    parent_bonus_wins: LEVELUP_PARENT_BONUS,
+  }).select().single()
+  if (error) {
+    // Likely a duplicate (unique constraint violation) — bonus already awarded this week
+    return null
+  }
+  return data
+}
+
+/* Add the bonus points to the kid's record. */
+export async function applyKidBonusPoints(kidId, bonusPoints) {
+  const { data: k } = await supabase.from('kids').select('points, lifetime_points').eq('id', kidId).single()
+  if (!k) return
+  await supabase.from('kids').update({
+    points: (k.points || 0) + bonusPoints,
+    lifetime_points: (k.lifetime_points || 0) + bonusPoints,
+  }).eq('id', kidId)
+}
+
+/* Kid-side variant of getLevelUpStatus. The kid doesn't know the parent's userId,
+   but we can compute the same numbers from the family-level data. We attribute ALL
+   approved claims in the family to "the parent" for win-counting purposes (single-
+   parent families are the common case; multi-parent split isn't shown to kids). */
+export async function getLevelUpStatusForKid(familyId, kidId, kidStreak) {
+  const monday = getWeekStarting()
+  const mondayISO = new Date(monday + 'T00:00:00').toISOString()
+
+  /* Kid's own approved points this week */
+  const { data: kidClaims } = await supabase.from('claims')
+    .select('points')
+    .eq('family_id', familyId)
+    .eq('kid_id', kidId)
+    .eq('status', 'approved')
+    .gte('resolved_at', mondayISO)
+  const kidPts = (kidClaims || []).reduce((s, r) => s + (r.points || 0), 0)
+
+  /* All approvals in the family this week — proxies for parent's wins */
+  const { count: parentWins } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .gte('resolved_at', mondayISO)
+
+  /* Did a bonus get awarded this week for this kid? */
+  const { data: existing } = await supabase.from('level_up_bonuses')
+    .select('*')
+    .eq('family_id', familyId)
+    .eq('kid_id', kidId)
+    .eq('week_starting', monday)
+    .maybeSingle()
+
+  /* For parent's streak from kid's view, we can approximate: count distinct days
+     of approvals across the family in the past 60 days. Not perfect, but good
+     enough since the kid doesn't manage this directly. */
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 864e5).toISOString()
+  const { data: recent } = await supabase.from('claims')
+    .select('resolved_at')
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .gte('resolved_at', sixtyDaysAgo)
+    .order('resolved_at', { ascending: false })
+  const dateSet = new Set((recent || []).map(r => (r.resolved_at || '').slice(0, 10)))
+  let parentStreak = 0
+  let cursor = new Date(); cursor.setHours(0, 0, 0, 0)
+  const today = cursor.toISOString().slice(0, 10)
+  if (!dateSet.has(today)) cursor.setDate(cursor.getDate() - 1)
+  while (true) {
+    const key = cursor.toISOString().slice(0, 10)
+    if (dateSet.has(key)) { parentStreak++; cursor.setDate(cursor.getDate() - 1) }
+    else break
+  }
+
+  const winsCount = parentWins || 0
+  const thresholdsMet = kidPts >= LEVELUP_KID_POINTS_GOAL && winsCount >= LEVELUP_PARENT_WINS_GOAL
+  const streaksMet = (kidStreak || 0) >= LEVELUP_STREAK_GOAL && parentStreak >= LEVELUP_STREAK_GOAL
+  const eligible = thresholdsMet || streaksMet
+
+  return {
+    kidPts, kidGoal: LEVELUP_KID_POINTS_GOAL,
+    parentWins: winsCount, parentGoal: LEVELUP_PARENT_WINS_GOAL,
+    kidStreak: kidStreak || 0, parentStreak,
+    streakGoal: LEVELUP_STREAK_GOAL,
+    thresholdsMet, streaksMet, eligible,
+    alreadyAwarded: !!existing, awardedBonus: existing,
+    kidBonus: LEVELUP_KID_BONUS, parentBonus: LEVELUP_PARENT_BONUS,
+  }
+}
+
+/* Monday-anchored parent win count — used by Level Up Together so the
+   parent's "wins this week" lines up with the kid's Monday-reset points and
+   the Monday-keyed bonus row. (The parent-rewards shelf intentionally keeps
+   its own rolling-7-day count in countWinsThisWeek; this does not touch it.)
+   Mirrors countWinsThisWeek's attribution: this parent + legacy-null. */
+export async function parentWinsThisWeek(familyId, userId) {
+  const monday = getWeekStarting()
+  const mondayISO = new Date(monday + 'T00:00:00').toISOString()
+  const { count: attributed } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .gte('resolved_at', mondayISO)
+    .eq('approver_user_id', userId)
+  const { count: legacy } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .gte('resolved_at', mondayISO)
+    .is('approver_user_id', null)
+  return (attributed || 0) + (legacy || 0)
+}
+
+/* Compute everything the UI needs to render the Level Up card. */
+export async function getLevelUpStatus(familyId, kidId, userId, kidStreak) {
+  const [kidPts, parentWins, existing] = await Promise.all([
+    kidPointsThisWeek(familyId, kidId),
+    parentWinsThisWeek(familyId, userId),
+    getLevelUpBonusThisWeek(familyId, kidId, userId),
+  ])
+  const parentStreak = await getParentStreak(familyId, userId)
+
+  const thresholdsMet = kidPts >= LEVELUP_KID_POINTS_GOAL && parentWins >= LEVELUP_PARENT_WINS_GOAL
+  const streaksMet = (kidStreak || 0) >= LEVELUP_STREAK_GOAL && parentStreak >= LEVELUP_STREAK_GOAL
+  const eligible = thresholdsMet || streaksMet
+
+  return {
+    kidPts, kidGoal: LEVELUP_KID_POINTS_GOAL,
+    parentWins, parentGoal: LEVELUP_PARENT_WINS_GOAL,
+    kidStreak: kidStreak || 0, parentStreak,
+    streakGoal: LEVELUP_STREAK_GOAL,
+    thresholdsMet, streaksMet, eligible,
+    alreadyAwarded: !!existing, awardedBonus: existing,
+    kidBonus: LEVELUP_KID_BONUS, parentBonus: LEVELUP_PARENT_BONUS,
+  }
+}
+
 /* ---- counts (for badges + today line) ---- */
 export async function countApprovedClaims(familyId, kind = null, kidId) {
   let q = supabase.from('claims').select('id', { count: 'exact', head: true })
@@ -533,6 +730,8 @@ export function subscribeFamily(familyId, onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'parent_rewards',
         filter: `family_id=eq.${familyId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'parent_claims',
+        filter: `family_id=eq.${familyId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'level_up_bonuses',
         filter: `family_id=eq.${familyId}` }, onChange)
     .subscribe()
   return () => { supabase.removeChannel(ch) }

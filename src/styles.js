@@ -138,6 +138,11 @@ export const S = {
     fontFamily: "'Inter', sans-serif", fontWeight: 800,
     fontSize: 19, letterSpacing: "-0.055em", color: "var(--ink)",
   },
+  brandMy: {
+    fontFamily: "'Fraunces', serif", fontWeight: 400, fontStyle: "italic",
+    fontSize: 17, color: "var(--accent)", letterSpacing: "-0.01em",
+    marginRight: 4, fontVariationSettings: "'opsz' 14",
+  },
   brandDot: {
     display: "inline-block", width: 5, height: 5, borderRadius: "50%",
     background: "var(--accent)", margin: "0 4px 1px",
@@ -565,6 +570,16 @@ export const S = {
   authFooterLink: {
     fontSize: 12, color: "var(--mute)",
     textDecoration: "underline", fontWeight: 500,
+  },
+  appFooter: {
+    marginTop: 36, paddingTop: 18,
+    borderTop: "1px solid var(--hair)",
+    textAlign: "center",
+  },
+  appFooterLink: {
+    fontSize: 11.5, color: "var(--mute)",
+    textDecoration: "underline", fontWeight: 500,
+    letterSpacing: 0.3,
   },
 
   /* ===== CHILD DATA PANEL (COPPA review/delete) ===== */
@@ -1182,6 +1197,104 @@ export const S = {
     background: "var(--accent)",
     color: "#fff", fontSize: 9.5, fontWeight: 700, minWidth: 16, height: 16,
     borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px",
+  },
+
+  /* ===== LEVEL UP TOGETHER — shared weekly bonus mechanic =====
+     The "together" part of the app made structural. Normal state is an
+     ink slab (sibling to the next-reward feature) marked by a magenta top
+     rule; the won state escalates to a solid magenta card. Kicker color is
+     shared across both states, so it stays a translucent white that reads on
+     ink AND magenta — the dot carries the accent. */
+  levelupCard: {
+    position: "relative", marginTop: 28,
+    background: "var(--ink)", color: "#fff",
+    borderRadius: 8, padding: "24px 24px 20px",
+    borderTop: "3px solid var(--accent)",
+    overflow: "hidden",
+  },
+  levelupCardWon: {
+    position: "relative", marginTop: 28,
+    background: "var(--accent)", color: "#fff",
+    borderRadius: 8, padding: "30px 24px 28px",
+    overflow: "hidden",
+    boxShadow: "0 14px 34px -16px rgba(233,30,99,.55)",
+  },
+  levelupKicker: {
+    display: "flex", alignItems: "center", gap: 8,
+    fontFamily: "'Inter', sans-serif", fontSize: 10,
+    fontWeight: 600, letterSpacing: 2.2, textTransform: "uppercase",
+    color: "rgba(255,255,255,.62)", marginBottom: 16,
+  },
+  levelupDot: {
+    width: 5, height: 5, borderRadius: "50%",
+    background: "var(--accent)", flexShrink: 0,
+  },
+  levelupTitle: {
+    fontFamily: "'Fraunces', serif", fontWeight: 400,
+    fontSize: 29, lineHeight: 1.02, letterSpacing: "-0.03em",
+    color: "#fff", marginBottom: 8,
+    fontVariationSettings: "'opsz' 100",
+  },
+  levelupTitleItalic: {
+    fontStyle: "italic", color: "var(--accent)", fontWeight: 400,
+  },
+  levelupHint: {
+    fontFamily: "'Inter', sans-serif", fontSize: 12.5,
+    fontWeight: 400, color: "rgba(255,255,255,.6)",
+    lineHeight: 1.45, marginBottom: 6, maxWidth: 330,
+  },
+  levelupTriggerWrap: {
+    marginTop: 18,
+  },
+  levelupTriggerLabel: {
+    fontFamily: "'Inter', sans-serif", fontSize: 9.5,
+    fontWeight: 700, letterSpacing: 1.8, textTransform: "uppercase",
+    color: "rgba(255,255,255,.42)", marginBottom: 12,
+  },
+  levelupRow: {
+    display: "flex", alignItems: "center", gap: 12,
+    marginBottom: 10,
+  },
+  levelupRowLabel: {
+    fontFamily: "'Inter', sans-serif", fontSize: 12,
+    fontWeight: 600, color: "#fff",
+    width: 54, flexShrink: 0,
+    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+  },
+  levelupBarTrack: {
+    flex: 1, height: 5, borderRadius: 999,
+    background: "rgba(255,255,255,.15)", overflow: "hidden",
+  },
+  levelupBarFill: {
+    height: "100%", borderRadius: 999,
+    background: "var(--accent)",
+    transition: "width .6s cubic-bezier(.2,.8,.3,1)",
+  },
+  levelupRowNum: {
+    fontFamily: "'Inter', sans-serif", fontSize: 11,
+    fontWeight: 500, color: "rgba(255,255,255,.7)",
+    letterSpacing: 0.2, width: 78, flexShrink: 0,
+    textAlign: "right", fontVariantNumeric: "tabular-nums",
+  },
+  levelupReward: {
+    marginTop: 20, paddingTop: 16,
+    borderTop: "1px solid rgba(255,255,255,.12)",
+    fontFamily: "'Inter', sans-serif", fontSize: 12.5,
+    fontWeight: 500, color: "#fff", letterSpacing: 0.1,
+  },
+  levelupWonBig: {
+    fontFamily: "'Fraunces', serif", fontWeight: 400,
+    fontSize: 30, lineHeight: 1.05, letterSpacing: "-0.03em",
+    color: "#fff", marginTop: 2,
+    fontVariationSettings: "'opsz' 100",
+  },
+  levelupWonItalic: {
+    fontStyle: "italic", color: "var(--ink)", fontWeight: 400,
+  },
+  levelupWonSub: {
+    fontFamily: "'Inter', sans-serif", fontSize: 13,
+    fontWeight: 500, color: "rgba(255,255,255,.85)",
+    marginTop: 12, letterSpacing: 0.1,
   },
 }
 
