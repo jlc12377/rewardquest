@@ -907,6 +907,11 @@ export const S = {
     fontSize: 10.5, color: "var(--accent)", fontWeight: 700, letterSpacing: 0.8,
     textTransform: "uppercase",
   },
+  freezeChip: {
+    display: "inline-flex", alignItems: "center",
+    fontSize: 9, letterSpacing: 1, marginLeft: 6,
+    opacity: 0.85, cursor: "default",
+  },
 
   /* ===== kid switcher (parent dashboard, hidden for one-kid families) ===== */
   kidSwitchWrap: {

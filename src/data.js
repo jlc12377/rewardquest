@@ -650,6 +650,81 @@ export async function countWinsThisWeek(familyId, userId) {
   return (attributed || 0) + (legacy || 0)
 }
 
+/* ----------------------------------------------------------------
+   KID STREAK — "one good choice a day," derived live (not stored).
+
+   A day counts if the kid has at least one APPROVED good-choice claim
+   credited to that day. Both kinds of good choice already land in the
+   `claims` table as kind='choice', status flows pending -> approved:
+     - a Smart Choice  -> label = the choice's label
+     - a reflection    -> label = "Video reflection: ..."
+   So both are counted here, and both are already parent-gated. We credit
+   the day the choice was MADE (claim_date), not the day it was approved,
+   so the streak doesn't swing on when the parent happens to tap approve.
+
+   FREEZES: the streak survives up to 3 missed days. Walking backward, each
+   gap day spends one freeze; once a 4th gap would be needed, the streak
+   ends. Freezes are derived (no stored counter) and reset with the streak.
+   Returns { streak, freezesRemaining, freezesUsed }.
+---------------------------------------------------------------- */
+export const KID_STREAK_MAX_FREEZES = 3
+
+export async function getKidStreak(familyId, kidId) {
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10)
+  let q = supabase.from('claims')
+    .select('claim_date')
+    .eq('family_id', familyId)
+    .eq('kind', 'choice')
+    .eq('status', 'approved')
+    .gte('claim_date', ninetyDaysAgo)
+  if (kidId) q = q.eq('kid_id', kidId)
+  const { data } = await q
+  if (!data || data.length === 0) {
+    return { streak: 0, freezesRemaining: KID_STREAK_MAX_FREEZES, freezesUsed: 0 }
+  }
+
+  // Set of YYYY-MM-DD dates that had at least one approved good choice.
+  const dateSet = new Set(data.map(r => r.claim_date).filter(Boolean))
+
+  let cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+  // Today not yet active doesn't break the streak — start from yesterday.
+  const today = cursor.toISOString().slice(0, 10)
+  if (!dateSet.has(today)) {
+    cursor.setDate(cursor.getDate() - 1)
+  }
+
+  let streak = 0
+  let freezesUsed = 0
+  let pendingGaps = 0  // gap days seen since the last active day; only "spent" if another active day follows
+  while (true) {
+    const key = cursor.toISOString().slice(0, 10)
+    if (dateSet.has(key)) {
+      streak++
+      // Any gaps we walked through to reach this active day are now truly spent.
+      freezesUsed += pendingGaps
+      pendingGaps = 0
+    } else {
+      // A gap day. Tentatively hold it; it only costs a freeze if the streak
+      // continues past it. Stop if bridging it would need a 4th freeze.
+      if (freezesUsed + pendingGaps < KID_STREAK_MAX_FREEZES) {
+        pendingGaps++
+      } else {
+        break  // out of freezes — the streak ends here
+      }
+    }
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  // Trailing pendingGaps (gaps older than the earliest active day) are NOT
+  // spent — they don't protect anything — so they don't reduce freezes.
+
+  return {
+    streak,
+    freezesRemaining: KID_STREAK_MAX_FREEZES - freezesUsed,
+    freezesUsed,
+  }
+}
+
 /* Compute the current "approved 1+ per day" streak for a parent.
    We pull resolved_at dates of approved claims and count consecutive
    days ending today (or yesterday if today hasn't seen activity yet). */

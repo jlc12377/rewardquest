@@ -14,7 +14,7 @@ import {
   uploadProof, subscribeFamily,
   countApprovedClaims, countVideos, countRedemptions, countApprovedToday,
   getParentRewards, addParentReward, updateParentReward, deleteParentReward,
-  addParentClaim, getParentClaims, countWinsThisWeek, getParentStreak,
+  addParentClaim, getParentClaims, countWinsThisWeek, getParentStreak, getKidStreak,
   getLevelUpStatus, getLevelUpStatusForKid, awardLevelUpBonus, applyKidBonusPoints,
   LEVELUP_KID_POINTS_GOAL, LEVELUP_PARENT_WINS_GOAL, LEVELUP_STREAK_GOAL,
 } from './data.js'
@@ -326,6 +326,7 @@ function KidApp({ familyId, kidId, user }) {
   const [pointsBump, setPointsBump] = useState(false)
   const [badgePop, setBadgePop] = useState(null)
   const [kidLevelUpStatus, setKidLevelUpStatus] = useState(null)
+  const [kidStreakInfo, setKidStreakInfo] = useState(null)
   const seenBadgesRef = useRef(null)
   const lastPointsRef = useRef(null)
 
@@ -345,7 +346,6 @@ function KidApp({ familyId, kidId, user }) {
       countApprovedToday(familyId, kidId),
     ])
     if (f.data) setFamily(f.data)
-    if (k.data) setKid(k.data)
     if (t.data) setTasks(t.data)
     if (d.data) setDecisions(d.data)
     if (r.data) setRewards(r.data)
@@ -355,8 +355,21 @@ function KidApp({ familyId, kidId, user }) {
       approved: ca.count || 0, chores: cc.count || 0,
       videos: cv.count || 0, redemptions: cr.count || 0, today: ct.count || 0,
     })
+    // Kid streak is DERIVED live ("one approved good choice a day", 3 freezes),
+    // not read from the stored kids.streak field. We overwrite the in-memory
+    // kid object's .streak so every existing display picks up the real value,
+    // and stash freezes separately for the streak chip.
+    let derivedStreak = 0
+    if (kidId) {
+      const ks = await getKidStreak(familyId, kidId)
+      derivedStreak = ks.streak
+      setKidStreakInfo(ks)
+    }
+    if (k.data) {
+      setKid({ ...k.data, streak: derivedStreak })
+    }
     if (kidId && k.data) {
-      const luStatus = await getLevelUpStatusForKid(familyId, kidId, k.data.streak || 0)
+      const luStatus = await getLevelUpStatusForKid(familyId, kidId, derivedStreak)
       setKidLevelUpStatus(luStatus)
     }
   }, [familyId, kidId])
@@ -455,7 +468,7 @@ function KidApp({ familyId, kidId, user }) {
 
   return (
     <div style={themedApp}>
-      <KidHeader family={kid} pointsBump={pointsBump} />
+      <KidHeader family={kid} pointsBump={pointsBump} streakInfo={kidStreakInfo} />
       <main style={S.main}>
         {tab === 'home' && (
           <KidHome family={kid} rewards={rewards} pending={pending}
@@ -493,9 +506,10 @@ function KidApp({ familyId, kidId, user }) {
 }
 
 /* kid header — wordmark, soft subtitle, points number */
-function KidHeader({ family, pointsBump }) {
-  const streak = family.streak || 1
+function KidHeader({ family, pointsBump, streakInfo }) {
+  const streak = family.streak || 0
   const avatar = family.avatar_emoji || '✨'
+  const freezesLeft = streakInfo ? streakInfo.freezesRemaining : null
   return (
     <header style={S.header}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -505,7 +519,14 @@ function KidHeader({ family, pointsBump }) {
             <span style={S.brandWord}><span style={S.brandMy}>my</span>reward<span style={S.brandDot}></span>quest</span>
           </div>
           <div style={S.whoami}>
-            <span style={S.miniStreakChip}>{streak}-day streak</span>
+            <span style={S.miniStreakChip}>
+              {streak > 0 ? `${streak}-day streak` : 'Start your streak'}
+            </span>
+            {streak > 0 && freezesLeft != null && (
+              <span style={S.freezeChip} title={`${freezesLeft} streak freeze${freezesLeft !== 1 ? 's' : ''} left — miss a day and one saves your streak`}>
+                {'🧊'.repeat(freezesLeft)}{'·'.repeat(Math.max(0, 3 - freezesLeft))}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -954,8 +975,11 @@ function ParentApp({ familyId, user }) {
        the kid's bonus points. The parent's bonus is acknowledgment-only (no
        wins-currency decrement, just a visible badge). */
     if (curKid) {
-      const activeKidObj = ks.data?.find(k => k.id === curKid)
-      const luStatus = await getLevelUpStatus(familyId, curKid, user.id, activeKidObj?.streak || 0)
+      // Use the DERIVED kid streak (same rule the kid side computes), not the
+      // stale stored kids.streak, so the Level Up "streaks" trigger matches
+      // what the kid sees on her own card.
+      const kidStreakInfo = await getKidStreak(familyId, curKid)
+      const luStatus = await getLevelUpStatus(familyId, curKid, user.id, kidStreakInfo.streak)
       if (luStatus.eligible && !luStatus.alreadyAwarded) {
         const trigger = luStatus.thresholdsMet ? 'thresholds' : 'streaks'
         const awarded = await awardLevelUpBonus(familyId, curKid, user.id, trigger)
