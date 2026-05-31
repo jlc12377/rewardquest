@@ -103,14 +103,25 @@ function AuthScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [parentConsent, setParentConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
+
+  /* A parent (no invite code) signing up must affirm:
+     - They are 18 or older
+     - They are the parent or guardian of any child they invite
+     - They've read and accepted the privacy policy */
+  const isParentSignup = mode === 'signup' && !inviteCode.trim()
 
   const submit = async (e) => {
     e.preventDefault()
     setErr(null)
     if (!email || !password) { setErr('Enter both email and password'); return }
     if (password.length < 6) { setErr('Password must be at least 6 characters'); return }
+    if (mode === 'signup' && isParentSignup && !parentConsent) {
+      setErr('Please confirm you are 18+ and the parent or guardian to continue.')
+      return
+    }
     setBusy(true)
     let result
     if (mode === 'signup') {
@@ -153,6 +164,21 @@ function AuthScreen() {
               autoCapitalize="characters"
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
           )}
+
+          {isParentSignup && (
+            <label style={S.consentBox}>
+              <input type="checkbox" checked={parentConsent}
+                onChange={(e) => setParentConsent(e.target.checked)}
+                style={S.consentCheckbox} />
+              <span style={S.consentText}>
+                I am 18 or older and the parent or legal guardian of any child I add to this account. I have read and agree to the{' '}
+                <a href="/privacy.html" target="_blank" rel="noopener" style={S.consentLink}>
+                  Privacy Policy
+                </a>.
+              </span>
+            </label>
+          )}
+
           {err && <div style={{ ...S.authErr, marginTop: 16 }}>{err}</div>}
           <button type="submit" style={{ ...S.primaryBtn, marginTop: 28 }} className="rq-press" disabled={busy}>
             {busy ? '…' : (mode === 'signup' ? 'Create account' : 'Sign in')}
@@ -164,12 +190,25 @@ function AuthScreen() {
           {mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create one'}
         </button>
 
-        {mode === 'signup' && (
+        {mode === 'signup' && !inviteCode.trim() && (
           <div style={S.authInfo}>
             <strong>Parent:</strong> leave the family code blank. After signing in, you&rsquo;ll see a code to give your kid.<br/>
             <strong>Kid:</strong> enter the family code your parent gives you (looks like <em>RQ-XXXX</em>).
           </div>
         )}
+
+        {mode === 'signup' && inviteCode.trim() && (
+          <div style={S.authInfo}>
+            <strong>Heads up:</strong> Your parent set up this family, so they&rsquo;ll be able to see
+            everything you do here. They&rsquo;re the one approving your quests and rewards.
+          </div>
+        )}
+
+        <div style={S.authFooter}>
+          <a href="/privacy.html" target="_blank" rel="noopener" style={S.authFooterLink}>
+            Privacy Policy
+          </a>
+        </div>
       </div>
     </div>
   )
@@ -1722,6 +1761,188 @@ function ParentEdit({ family, kids, activeKidId, tasks, decisions, rewards, fami
         color="var(--accent)" items={decisions} table="decisions"
         familyId={familyId} kidId={kidId} defaultPts={40} flash={flash} reload={reload} />
       <RewardEditor rewards={rewards} familyId={familyId} kidId={kidId} flash={flash} reload={reload} />
+      <ChildDataPanel
+        activeKid={activeKid} kidId={kidId} familyId={familyId}
+        flash={flash} reload={reload}
+      />
+    </div>
+  )
+}
+
+/* ============================================================
+   CHILD DATA PANEL — COPPA "right to review and delete"
+   Parents can see all of their child's submitted data (photos,
+   videos, claim history, redemptions) and delete it.
+   ============================================================ */
+function ChildDataPanel({ activeKid, kidId, familyId, flash, reload }) {
+  const [items, setItems] = useState({ videos: [], claims: [], redemptions: [] })
+  const [loaded, setLoaded] = useState(false)
+  const [confirmingNuke, setConfirmingNuke] = useState(false)
+
+  useEffect(() => {
+    if (!kidId) return
+    let cancelled = false
+    ;(async () => {
+      const [vid, cls, red] = await Promise.all([
+        supabase.from('videos').select('*').eq('kid_id', kidId).order('created_at', { ascending: false }),
+        supabase.from('claims').select('*').eq('kid_id', kidId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('redemptions').select('*').eq('kid_id', kidId).order('created_at', { ascending: false }),
+      ])
+      if (cancelled) return
+      setItems({
+        videos: vid.data || [],
+        claims: cls.data || [],
+        redemptions: red.data || [],
+      })
+      setLoaded(true)
+    })()
+    return () => { cancelled = true }
+  }, [kidId, reload])
+
+  const deleteOne = async (table, id) => {
+    if (!confirm('Delete this item? This cannot be undone.')) return
+    await supabase.from(table).delete().eq('id', id)
+    flash('Deleted')
+    reload()
+  }
+
+  const deleteAllChildData = async () => {
+    if (!kidId) return
+    await Promise.all([
+      supabase.from('videos').delete().eq('kid_id', kidId),
+      supabase.from('claims').delete().eq('kid_id', kidId),
+      supabase.from('redemptions').delete().eq('kid_id', kidId),
+    ])
+    setConfirmingNuke(false)
+    flash(`All data for ${activeKid?.name || 'this kid'} deleted`)
+    reload()
+  }
+
+  const kidLabel = (activeKid && activeKid.name && activeKid.name !== 'Kid' && activeKid.name !== 'My family')
+    ? activeKid.name : 'your child'
+
+  const totalItems = items.videos.length + items.claims.length + items.redemptions.length
+
+  return (
+    <div style={S.dataPanelWrap}>
+      <h2 style={S.h2}>Your child&rsquo;s data</h2>
+      <p style={S.sectionHint}>
+        As a parent, you can see and delete everything {kidLabel} has submitted. Photos and videos
+        are stored privately and only visible to you and {kidLabel}.
+      </p>
+
+      {!loaded ? (
+        <div style={S.sectionHint}>Loading…</div>
+      ) : totalItems === 0 ? (
+        <div style={S.dataEmpty}>No data submitted yet.</div>
+      ) : (
+        <>
+          {items.videos.length > 0 && (
+            <>
+              <div style={S.dataKicker}>Photos &amp; Videos ({items.videos.length})</div>
+              {items.videos.map(v => (
+                <div key={v.id} style={S.dataRow}>
+                  <Thumb url={v.media_url} type={v.media_type} size={40} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.dataRowTitle}>{v.prompt || 'Video reflection'}</div>
+                    <div style={S.dataRowMeta}>
+                      {new Date(v.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  </div>
+                  <button onClick={() => deleteOne('videos', v.id)}
+                    style={S.iconBtnDel} className="rq-press" aria-label="Delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+
+          {items.claims.length > 0 && (
+            <>
+              <div style={{ ...S.dataKicker, marginTop: 18 }}>Quest history ({items.claims.length})</div>
+              {items.claims.slice(0, 10).map(c => (
+                <div key={c.id} style={S.dataRow}>
+                  <div style={S.dataRowIcon}>
+                    {c.media_url ? <Thumb url={c.media_url} type={c.media_type} size={36} /> :
+                      <span style={{ fontSize: 18 }}>{c.status === 'approved' ? '✓' : c.status === 'declined' ? '✗' : '…'}</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.dataRowTitle}>{c.label}</div>
+                    <div style={S.dataRowMeta}>
+                      {c.status} · {c.points} pts ·{' '}
+                      {new Date(c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                  <button onClick={() => deleteOne('claims', c.id)}
+                    style={S.iconBtnDel} className="rq-press" aria-label="Delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              {items.claims.length > 10 && (
+                <div style={{ ...S.sectionHint, marginTop: 4, fontSize: 12 }}>
+                  Showing 10 most recent of {items.claims.length} quests.
+                </div>
+              )}
+            </>
+          )}
+
+          {items.redemptions.length > 0 && (
+            <>
+              <div style={{ ...S.dataKicker, marginTop: 18 }}>Rewards redeemed ({items.redemptions.length})</div>
+              {items.redemptions.slice(0, 10).map(r => (
+                <div key={r.id} style={S.dataRow}>
+                  <div style={{ ...S.dataRowIcon, fontSize: 20 }}>{r.emoji || '🎁'}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={S.dataRowTitle}>{r.reward_label}</div>
+                    <div style={S.dataRowMeta}>
+                      {r.cost} pts · {new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                  <button onClick={() => deleteOne('redemptions', r.id)}
+                    style={S.iconBtnDel} className="rq-press" aria-label="Delete">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+
+      <div style={S.dataNukeWrap}>
+        {confirmingNuke ? (
+          <>
+            <div style={S.dataNukeWarning}>
+              <strong>Delete everything?</strong> This will permanently remove all of {kidLabel}&rsquo;s
+              photos, videos, quest history, and redemption history. This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button onClick={() => setConfirmingNuke(false)} style={S.dataNukeCancel} className="rq-press">
+                Cancel
+              </button>
+              <button onClick={deleteAllChildData} style={S.dataNukeBtn} className="rq-press">
+                Yes, delete everything
+              </button>
+            </div>
+          </>
+        ) : (
+          totalItems > 0 && (
+            <button onClick={() => setConfirmingNuke(true)} style={S.dataNukeLink} className="rq-press">
+              Delete all of {kidLabel}&rsquo;s data
+            </button>
+          )
+        )}
+      </div>
+
+      <p style={{ ...S.sectionHint, marginTop: 20, fontSize: 12 }}>
+        To delete the child&rsquo;s entire account (including their login),
+        email{' '}
+        <a href="mailto:oliviahopeslife@gmail.com" style={{ color: 'var(--accent)' }}>
+          oliviahopeslife@gmail.com
+        </a>.
+      </p>
     </div>
   )
 }

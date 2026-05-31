@@ -540,6 +540,89 @@ export const S = {
     background: "var(--shelf)", color: "var(--ink)", fontSize: 12.5, fontWeight: 400,
     padding: "14px 16px", lineHeight: 1.55, borderRadius: 4,
   },
+  consentBox: {
+    display: "flex", alignItems: "flex-start", gap: 10,
+    marginTop: 16, padding: "12px 14px",
+    background: "var(--shelf)", borderRadius: 4,
+    cursor: "pointer",
+  },
+  consentCheckbox: {
+    marginTop: 3, flexShrink: 0, cursor: "pointer",
+    width: 16, height: 16, accentColor: "var(--accent)",
+  },
+  consentText: {
+    fontSize: 12.5, lineHeight: 1.5, color: "var(--ink)", fontWeight: 500,
+  },
+  consentLink: {
+    color: "var(--accent)", textDecoration: "underline",
+    fontWeight: 600,
+  },
+  authFooter: {
+    marginTop: 30, paddingTop: 18,
+    borderTop: "1px solid var(--hair)",
+    textAlign: "center",
+  },
+  authFooterLink: {
+    fontSize: 12, color: "var(--mute)",
+    textDecoration: "underline", fontWeight: 500,
+  },
+
+  /* ===== CHILD DATA PANEL (COPPA review/delete) ===== */
+  dataPanelWrap: {
+    marginTop: 36, paddingTop: 28,
+    borderTop: "1px solid var(--hair)",
+  },
+  dataKicker: {
+    fontSize: 10.5, fontWeight: 700, letterSpacing: 1.6,
+    textTransform: "uppercase", color: "var(--mute)",
+    marginTop: 8, marginBottom: 8,
+  },
+  dataEmpty: {
+    background: "var(--shelf)", padding: "14px 16px",
+    borderRadius: 4, fontSize: 13, color: "var(--mute)", fontWeight: 500,
+  },
+  dataRow: {
+    display: "flex", alignItems: "center", gap: 12,
+    padding: "10px 0", borderBottom: "1px solid var(--hair)",
+  },
+  dataRowIcon: {
+    width: 40, height: 40, borderRadius: 4,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    background: "var(--shelf)", flexShrink: 0,
+  },
+  dataRowTitle: {
+    fontSize: 13.5, fontWeight: 600, color: "var(--ink)",
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  },
+  dataRowMeta: {
+    fontSize: 11.5, color: "var(--mute)", marginTop: 2,
+  },
+  dataNukeWrap: {
+    marginTop: 24, paddingTop: 18,
+    borderTop: "1px dashed var(--hair)",
+  },
+  dataNukeLink: {
+    background: "none", border: "none", padding: 0,
+    color: "#C13434", fontSize: 13, fontWeight: 600,
+    cursor: "pointer", textDecoration: "underline",
+  },
+  dataNukeWarning: {
+    background: "#FFF0F0", border: "1px solid #F5C2C2",
+    borderRadius: 4, padding: "12px 14px",
+    fontSize: 13, lineHeight: 1.5, color: "#7A1F1F",
+  },
+  dataNukeBtn: {
+    flex: 1, background: "#C13434", color: "#fff", border: "none",
+    borderRadius: 4, padding: "10px 14px",
+    fontSize: 13, fontWeight: 700, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", letterSpacing: 0.3,
+  },
+  dataNukeCancel: {
+    background: "var(--paper)", border: "1px solid var(--hair)",
+    borderRadius: 4, padding: "10px 14px",
+    fontSize: 13, fontWeight: 600, cursor: "pointer", color: "var(--ink)",
+    fontFamily: "'Inter', sans-serif",
+  },
 
   /* ===== PARENT HOME ===== */
   parentGreeting: {

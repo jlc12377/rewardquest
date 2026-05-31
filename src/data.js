@@ -31,8 +31,18 @@ export async function signUp(email, password, inviteCode) {
       options: { data: { pending_invite_code: cleanCode } },
     })
   }
-  // No invite code → starting a new family as a parent
-  return await supabase.auth.signUp({ email, password })
+  // No invite code → starting a new family as a parent.
+  // Stamp a parental consent timestamp so we have a record of when they agreed
+  // to the privacy policy and confirmed they're the parent/guardian.
+  return await supabase.auth.signUp({
+    email, password,
+    options: {
+      data: {
+        parental_consent_at: new Date().toISOString(),
+        parental_consent_version: '2026-05-30',
+      },
+    },
+  })
 }
 export async function signIn(email, password) {
   return await supabase.auth.signInWithPassword({ email, password })
