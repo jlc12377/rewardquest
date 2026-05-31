@@ -676,10 +676,11 @@ export async function getKidStreak(familyId, kidId) {
     .eq('family_id', familyId)
     .eq('kind', 'choice')
     .eq('status', 'approved')
+    .not('claim_date', 'is', null)
     .gte('claim_date', ninetyDaysAgo)
   if (kidId) q = q.eq('kid_id', kidId)
-  const { data } = await q
-  if (!data || data.length === 0) {
+  const { data, error } = await q
+  if (error || !data || data.length === 0) {
     return { streak: 0, freezesRemaining: KID_STREAK_MAX_FREEZES, freezesUsed: 0 }
   }
 

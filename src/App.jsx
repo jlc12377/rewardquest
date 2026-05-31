@@ -361,9 +361,14 @@ function KidApp({ familyId, kidId, user }) {
     // and stash freezes separately for the streak chip.
     let derivedStreak = 0
     if (kidId) {
-      const ks = await getKidStreak(familyId, kidId)
-      derivedStreak = ks.streak
-      setKidStreakInfo(ks)
+      try {
+        const ks = await getKidStreak(familyId, kidId)
+        derivedStreak = ks?.streak || 0
+        setKidStreakInfo(ks)
+      } catch (e) {
+        derivedStreak = 0
+        setKidStreakInfo(null)
+      }
     }
     if (k.data) {
       setKid({ ...k.data, streak: derivedStreak })
@@ -977,9 +982,16 @@ function ParentApp({ familyId, user }) {
     if (curKid) {
       // Use the DERIVED kid streak (same rule the kid side computes), not the
       // stale stored kids.streak, so the Level Up "streaks" trigger matches
-      // what the kid sees on her own card.
-      const kidStreakInfo = await getKidStreak(familyId, curKid)
-      const luStatus = await getLevelUpStatus(familyId, curKid, user.id, kidStreakInfo.streak)
+      // what the kid sees on her own card. Wrapped defensively: a streak hiccup
+      // must never prevent the Level Up card from rendering.
+      let kidStreakVal = 0
+      try {
+        const ksInfo = await getKidStreak(familyId, curKid)
+        kidStreakVal = ksInfo?.streak || 0
+      } catch (e) {
+        kidStreakVal = 0
+      }
+      const luStatus = await getLevelUpStatus(familyId, curKid, user.id, kidStreakVal)
       if (luStatus.eligible && !luStatus.alreadyAwarded) {
         const trigger = luStatus.thresholdsMet ? 'thresholds' : 'streaks'
         const awarded = await awardLevelUpBonus(familyId, curKid, user.id, trigger)
