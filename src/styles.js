@@ -787,6 +787,14 @@ export const S = {
     letterSpacing: 1, textTransform: "uppercase",
     borderTop: "1px solid var(--hair)",
   },
+  kidSignOutBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+    width: "100%", marginTop: 28, background: "transparent", border: "none",
+    color: "var(--mute)", borderRadius: 0, padding: "13px", fontWeight: 500, fontSize: 11,
+    letterSpacing: 1, textTransform: "uppercase",
+    borderTop: "1px solid var(--hair)",
+    cursor: "pointer",
+  },
 
   /* editors */
   itemRow: {

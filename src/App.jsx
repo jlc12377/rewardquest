@@ -486,7 +486,7 @@ function KidApp({ familyId, kidId, user }) {
         )}
         {tab === 'video' && <KidVideo onSave={onSaveVideo} videos={videos} family={kid} />}
         {tab === 'store' && <KidStore family={kid} rewards={rewards} onRedeem={onRedeem} />}
-        {tab === 'me'    && <KidMe family={kid} onSave={onSavePersonalize} />}
+        {tab === 'me'    && <KidMe family={kid} onSave={onSavePersonalize} onSignOut={signOut} />}
 
         <div style={S.appFooter}>
           <a href="/privacy.html" target="_blank" rel="noopener" style={S.appFooterLink}>
@@ -2460,7 +2460,7 @@ function BadgePop({ badge }) {
 /* ============================================================
    Personalize ("Me") page — avatar + theme
    ============================================================ */
-function KidMe({ family, onSave }) {
+function KidMe({ family, onSave, onSignOut }) {
   const [avatar, setAvatar] = useState(family.avatar_emoji || AVATAR_CHOICES[0])
   const [theme, setTheme] = useState(family.theme || THEMES[0].id)
   // Default to the category that contains the current avatar (so they don't have to re-find it)
@@ -2523,6 +2523,10 @@ function KidMe({ family, onSave }) {
 
       <button onClick={save} style={{ ...S.primaryBtn, marginTop: 22 }} className="rq-press">
         <Check size={18} /> Save
+      </button>
+
+      <button onClick={onSignOut} style={S.kidSignOutBtn} className="rq-press">
+        <LogOut size={14} /> Sign out
       </button>
     </div>
   )
