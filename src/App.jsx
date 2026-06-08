@@ -1881,21 +1881,29 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
             <Sparkles size={16} style={{ color: 'var(--accent)' }} />
             Lately
           </div>
-          {recentClaims.map((c) => (
-            <div key={c.id} style={S.latelyRow}>
-              <Thumb url={c.media_url} type={c.media_type} size={44} />
-              <div style={S.latelyText}>
-                <div style={S.latelyLabel}>{c.label}</div>
-                <div style={S.latelyMeta}>
-                  {c.status === 'approved' ? 'Approved' : 'Declined'} ·{' '}
-                  {new Date(c.resolved_at || c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+          {recentClaims.map((c) => {
+            const isVideo = c.media_type === 'video'
+            return (
+              <div key={c.id}
+                style={isVideo ? { ...S.latelyRow, cursor: 'pointer' } : S.latelyRow}
+                onClick={isVideo ? () => setTab('video') : undefined}
+                role={isVideo ? 'button' : undefined}
+                title={isVideo ? 'Watch in the Video section' : undefined}>
+                <Thumb url={c.media_url} type={c.media_type} size={44} />
+                <div style={S.latelyText}>
+                  <div style={S.latelyLabel}>{c.label}</div>
+                  <div style={S.latelyMeta}>
+                    {c.status === 'approved' ? 'Approved' : 'Declined'} ·{' '}
+                    {new Date(c.resolved_at || c.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    {isVideo && <span style={{ color: 'var(--accent)', fontWeight: 700 }}> · Watch in Videos →</span>}
+                  </div>
                 </div>
+                <span style={c.status === 'approved' ? S.latelyPts : S.latelyPtsDeclined}>
+                  {c.status === 'approved' ? `+${c.points}` : '—'}
+                </span>
               </div>
-              <span style={c.status === 'approved' ? S.latelyPts : S.latelyPtsDeclined}>
-                {c.status === 'approved' ? `+${c.points}` : '—'}
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </>
       )}
 
