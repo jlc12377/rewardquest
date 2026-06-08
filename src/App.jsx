@@ -400,6 +400,26 @@ function Thumb({ url, type, size = 44 }) {
     : <img src={url} alt="proof" style={{ ...S.thumb, width: size, height: size }} />
 }
 
+/* In-app media viewer. Plays video / shows photo INSIDE the app instead of
+   linking to the raw file — which mobile browsers fail to open (they leave the
+   tap dead) and desktop only opens via right-click. Tap backdrop or X to close.
+   `media` is { url, type } or null. */
+function MediaModal({ media, onClose }) {
+  if (!media) return null
+  return (
+    <div style={S.mediaModalBackdrop} onClick={onClose}>
+      <div style={S.mediaModalInner} onClick={(e) => e.stopPropagation()}>
+        <button type="button" style={S.mediaModalClose} onClick={onClose} aria-label="Close">
+          <X size={20} />
+        </button>
+        {media.type === 'video'
+          ? <video src={media.url} controls autoPlay playsInline style={S.mediaModalEl} />
+          : <img src={media.url} alt="proof" style={S.mediaModalEl} />}
+      </div>
+    </div>
+  )
+}
+
 function AppHeader({ family, role, onSignOut }) {
   return (
     <header style={S.header}>
@@ -1735,6 +1755,7 @@ function ParentMeEdit({ parentRewards, onSave, onDelete }) {
 }
 
 function ParentHome({ family, pending, videos, rewards, redemptions, recentClaims, counts, setTab }) {
+  const [viewing, setViewing] = useState(null)
   const dayName = new Date().toLocaleDateString(undefined, { weekday: 'long' })
   const dateStr = new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
   const latestVideo = videos[0]
@@ -1838,8 +1859,10 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
             <Film size={16} style={{ color: 'var(--accent)' }} />
             Her latest reflection
           </div>
-          <a href={latestVideo.media_url} target="_blank" rel="noreferrer" style={S.latestVideoCard}>
-            <video src={latestVideo.media_url} muted playsInline style={S.latestVideoThumb} />
+          <button type="button"
+            onClick={() => setViewing({ url: latestVideo.media_url, type: latestVideo.media_type })}
+            style={{ ...S.latestVideoCard, border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}>
+            <video src={latestVideo.media_url} muted playsInline style={{ ...S.latestVideoThumb, pointerEvents: 'none' }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={S.latestVideoTag}>NEW · TAP TO WATCH</div>
               <div style={S.latestVideoPrompt}>{latestVideo.prompt}</div>
@@ -1848,7 +1871,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
               </div>
             </div>
             <Play size={22} style={{ color: 'var(--accent)' }} />
-          </a>
+          </button>
         </>
       )}
 
@@ -1882,11 +1905,13 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
           <span>Once she starts logging, you'll see her progress here.</span>
         </div>
       )}
+      <MediaModal media={viewing} onClose={() => setViewing(null)} />
     </div>
   )
 }
 
 function ParentApprovals({ pending, onApprove, onDecline }) {
+  const [viewing, setViewing] = useState(null)
   const chores = pending.filter((p) => p.kind === 'chore')
   const choices = pending.filter((p) => p.kind === 'choice')
 
@@ -1900,10 +1925,12 @@ function ParentApprovals({ pending, onApprove, onDecline }) {
           {new Date(d.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
         </div>
         {d.media_url && (
-          <a href={d.media_url} target="_blank" rel="noreferrer"
-            style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 800, textDecoration: 'none' }}>
-            Open full
-          </a>
+          <button type="button"
+            onClick={() => setViewing({ url: d.media_url, type: d.media_type })}
+            style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 800,
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+            View full
+          </button>
         )}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -1944,11 +1971,13 @@ function ParentApprovals({ pending, onApprove, onDecline }) {
           {choices.map(Card)}
         </>
       )}
+      <MediaModal media={viewing} onClose={() => setViewing(null)} />
     </div>
   )
 }
 
 function ParentVideos({ videos, family }) {
+  const [viewing, setViewing] = useState(null)
   return (
     <div className="rq-fade">
       <h2 style={S.h2}>Video archive</h2>
@@ -1962,8 +1991,10 @@ function ParentVideos({ videos, family }) {
         </div>
       ) : (
         videos.map((v) => (
-          <a key={v.id} href={v.media_url} target="_blank" rel="noreferrer"
-            style={{ ...S.videoLogRow, textDecoration: 'none', color: 'inherit' }}>
+          <button key={v.id} type="button"
+            onClick={() => setViewing({ url: v.media_url, type: v.media_type })}
+            style={{ ...S.videoLogRow, textDecoration: 'none', color: 'inherit',
+              background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}>
             <Thumb url={v.media_url} type={v.media_type} size={56} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ ...S.videoLogPrompt, whiteSpace: 'normal' }}>{v.prompt}</div>
@@ -1973,9 +2004,10 @@ function ParentVideos({ videos, family }) {
               </div>
             </div>
             <Play size={18} style={{ color: 'var(--accent)' }} />
-          </a>
+          </button>
         ))
       )}
+      <MediaModal media={viewing} onClose={() => setViewing(null)} />
     </div>
   )
 }

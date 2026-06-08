@@ -544,6 +544,29 @@ export const S = {
     textDecorationColor: "var(--hair)", textUnderlineOffset: 3,
     padding: "2px 0",
   },
+  mediaModalBackdrop: {
+    position: "fixed", inset: 0, zIndex: 1000,
+    background: "rgba(10,10,10,0.82)",
+    backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: 20,
+  },
+  mediaModalInner: {
+    position: "relative", maxWidth: "100%", maxHeight: "100%",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  },
+  mediaModalEl: {
+    maxWidth: "100%", maxHeight: "82vh",
+    borderRadius: 12, background: "#000",
+    boxShadow: "0 20px 60px -20px rgba(0,0,0,0.6)",
+  },
+  mediaModalClose: {
+    position: "absolute", top: -14, right: -14, zIndex: 1,
+    width: 40, height: 40, borderRadius: 999,
+    background: "var(--paper)", border: "none", color: "var(--ink)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+  },
   authErr: {
     background: "transparent", color: "var(--err)", fontSize: 12.5, fontWeight: 500,
     borderLeft: "2px solid var(--err)", padding: "8px 12px",
