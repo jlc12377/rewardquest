@@ -47,6 +47,18 @@ export async function signUp(email, password, inviteCode) {
 export async function signIn(email, password) {
   return await supabase.auth.signInWithPassword({ email, password })
 }
+/* Send a password-reset email. The link returns the user to the app, where
+   onAuthStateChange fires a PASSWORD_RECOVERY event and we show the
+   "set a new password" screen. */
+export async function sendPasswordReset(email) {
+  return await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: window.location.origin,
+  })
+}
+/* Set a new password for the currently-authenticated (recovery) session. */
+export async function updatePassword(newPassword) {
+  return await supabase.auth.updateUser({ password: newPassword })
+}
 export async function signOut() {
   return await supabase.auth.signOut()
 }

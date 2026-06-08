@@ -537,6 +537,13 @@ export const S = {
     textDecoration: "underline", textDecorationColor: "var(--accent)",
     textDecorationThickness: 1.5, textUnderlineOffset: 5,
   },
+  authForgot: {
+    background: "none", border: "none", color: "var(--mute)", fontSize: 12,
+    fontWeight: 500, marginTop: 10, marginBottom: 2, alignSelf: "flex-end",
+    cursor: "pointer", textDecoration: "underline",
+    textDecorationColor: "var(--hair)", textUnderlineOffset: 3,
+    padding: "2px 0",
+  },
   authErr: {
     background: "transparent", color: "var(--err)", fontSize: 12.5, fontWeight: 500,
     borderLeft: "2px solid var(--err)", padding: "8px 12px",

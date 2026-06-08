@@ -5,7 +5,7 @@ import {
   Pencil, Plus, Trash2, Check, LogOut, Film, Play, Palette, Sun,
 } from 'lucide-react'
 import {
-  signUp, signIn, signOut, getSession,
+  signUp, signIn, signOut, getSession, sendPasswordReset, updatePassword,
   joinOrCreateFamily, getFamily, updateFamily, ensureInviteCode,
   getKid, updateKid, getKidsForFamily,
   getTasks, getDecisions, getRewards, addRow, updateRow, deleteRow,
@@ -32,6 +32,7 @@ export default function App() {
   const [bootstrap, setBootstrap] = useState(null) // { familyId, role }
   const [bootErr, setBootErr] = useState(null)
   const [ready, setReady] = useState(false)
+  const [recovery, setRecovery] = useState(false) // password-recovery flow active
 
   useEffect(() => {
     (async () => {
@@ -39,7 +40,13 @@ export default function App() {
       setSession(data.session || null)
       setReady(true)
     })()
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, sess) => {
+      // When the user clicks the reset link in their email, Supabase signs them
+      // into a temporary recovery session and fires this event. Show the
+      // set-new-password screen instead of dropping them into the app.
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecovery(true)
+      }
       setSession(sess || null)
       setBootstrap(null)
     })
@@ -56,6 +63,7 @@ export default function App() {
   }, [session])
 
   if (!ready) return <Splash />
+  if (recovery) return <ResetPasswordScreen onDone={() => setRecovery(false)} />
   if (!session) return <AuthScreen />
   if (bootErr) return <ErrorScreen msg={bootErr} />
   if (!bootstrap) return <Splash msg="Setting up your family…" />
@@ -108,6 +116,7 @@ function AuthScreen() {
   const [parentConsent, setParentConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
+  const [resetSent, setResetSent] = useState(false)
 
   /* A parent (no invite code) signing up must affirm:
      - They are 18 or older
@@ -118,6 +127,18 @@ function AuthScreen() {
   const submit = async (e) => {
     e.preventDefault()
     setErr(null)
+
+    // Password-reset request: only needs an email.
+    if (mode === 'reset') {
+      if (!email) { setErr('Enter your email and we\u2019ll send a reset link'); return }
+      setBusy(true)
+      const { error } = await sendPasswordReset(email.trim())
+      setBusy(false)
+      if (error) { setErr(error.message || 'Could not send reset email'); return }
+      setResetSent(true)
+      return
+    }
+
     if (!email || !password) { setErr('Enter both email and password'); return }
     if (password.length < 6) { setErr('Password must be at least 6 characters'); return }
     if (mode === 'signup' && isParentSignup && !parentConsent) {
@@ -145,51 +166,77 @@ function AuthScreen() {
         <h1 style={S.authH1}>
           {mode === 'signup'
             ? <>Welcome <span style={S.authH1Italic}>in.</span></>
+            : mode === 'reset'
+            ? <>Reset your <span style={S.authH1Italic}>password.</span></>
             : <>Welcome <span style={S.authH1Italic}>back.</span></>}
         </h1>
         <p style={S.authSub}>
           {mode === 'signup'
             ? "Joining as a kid? Enter your family code below. Otherwise leave it blank to start a new family."
+            : mode === 'reset'
+            ? "Enter your email and we\u2019ll send you a link to set a new password."
             : 'Sign in to your family.'}
         </p>
 
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
-          <input style={S.authInput} type="email" autoComplete="email"
-            placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input style={S.authInput} type="password"
-            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-            placeholder="Password" value={password}
-            onChange={(e) => setPassword(e.target.value)} />
-          {mode === 'signup' && (
-            <input style={S.authInput} type="text"
-              placeholder="Family code (optional)" value={inviteCode}
-              autoCapitalize="characters"
-              onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
-          )}
+        {mode === 'reset' && resetSent ? (
+          <div style={{ ...S.authInfo, marginTop: 20 }}>
+            <strong>Check your inbox.</strong> If an account exists for that email,
+            a reset link is on its way. Open it on this device, and you&rsquo;ll be
+            able to set a new password. (Don&rsquo;t forget to check spam.)
+          </div>
+        ) : (
+          <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+            <input style={S.authInput} type="email" autoComplete="email"
+              placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            {mode !== 'reset' && (
+              <input style={S.authInput} type="password"
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                placeholder="Password" value={password}
+                onChange={(e) => setPassword(e.target.value)} />
+            )}
+            {mode === 'signup' && (
+              <input style={S.authInput} type="text"
+                placeholder="Family code (optional)" value={inviteCode}
+                autoCapitalize="characters"
+                onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
+            )}
 
-          {isParentSignup && (
-            <label style={S.consentBox}>
-              <input type="checkbox" checked={parentConsent}
-                onChange={(e) => setParentConsent(e.target.checked)}
-                style={S.consentCheckbox} />
-              <span style={S.consentText}>
-                I am 18 or older and the parent or legal guardian of any child I add to this account. I have read and agree to the{' '}
-                <a href="/privacy.html" target="_blank" rel="noopener" style={S.consentLink}>
-                  Privacy Policy
-                </a>.
-              </span>
-            </label>
-          )}
+            {mode === 'signin' && (
+              <button type="button" style={S.authForgot}
+                onClick={() => { setErr(null); setResetSent(false); setMode('reset') }}>
+                Forgot password?
+              </button>
+            )}
 
-          {err && <div style={{ ...S.authErr, marginTop: 16 }}>{err}</div>}
-          <button type="submit" style={{ ...S.primaryBtn, marginTop: 28 }} className="rq-press" disabled={busy}>
-            {busy ? '…' : (mode === 'signup' ? 'Create account' : 'Sign in')}
-          </button>
-        </form>
+            {isParentSignup && (
+              <label style={S.consentBox}>
+                <input type="checkbox" checked={parentConsent}
+                  onChange={(e) => setParentConsent(e.target.checked)}
+                  style={S.consentCheckbox} />
+                <span style={S.consentText}>
+                  I am 18 or older and the parent or legal guardian of any child I add to this account. I have read and agree to the{' '}
+                  <a href="/privacy.html" target="_blank" rel="noopener" style={S.consentLink}>
+                    Privacy Policy
+                  </a>.
+                </span>
+              </label>
+            )}
+
+            {err && <div style={{ ...S.authErr, marginTop: 16 }}>{err}</div>}
+            <button type="submit" style={{ ...S.primaryBtn, marginTop: 28 }} className="rq-press" disabled={busy}>
+              {busy ? '…' : (mode === 'signup' ? 'Create account' : mode === 'reset' ? 'Send reset link' : 'Sign in')}
+            </button>
+          </form>
+        )}
 
         <button type="button" style={S.authToggle}
-          onClick={() => { setErr(null); setMode(mode === 'signup' ? 'signin' : 'signup') }}>
-          {mode === 'signup' ? 'Have an account? Sign in' : 'New here? Create one'}
+          onClick={() => {
+            setErr(null); setResetSent(false)
+            setMode(mode === 'signin' ? 'signup' : 'signin')
+          }}>
+          {mode === 'signup' ? 'Have an account? Sign in'
+            : mode === 'reset' ? 'Back to sign in'
+            : 'New here? Create one'}
         </button>
 
         {mode === 'signup' && !inviteCode.trim() && (
@@ -217,8 +264,76 @@ function AuthScreen() {
 }
 
 /* ============================================================
-   Shared bits: proof picker, thumbnail, header
+   Reset password screen — shown after the user clicks the
+   reset link in their email (PASSWORD_RECOVERY session active)
    ============================================================ */
+function ResetPasswordScreen({ onDone }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [done, setDone] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setErr(null)
+    if (password.length < 6) { setErr('Password must be at least 6 characters'); return }
+    if (password !== confirm) { setErr('Those passwords don\u2019t match'); return }
+    setBusy(true)
+    const { error } = await updatePassword(password)
+    setBusy(false)
+    if (error) { setErr(error.message || 'Could not update password'); return }
+    setDone(true)
+  }
+
+  return (
+    <div style={S.app}>
+      <style>{CSS}</style>
+      <div style={S.authWrap} className="rq-fade">
+        <div style={S.authBrand}>
+          <span style={S.brandWord}><span style={S.brandMy}>my</span>reward<span style={S.brandDot}></span>quest</span>
+        </div>
+        <h1 style={S.authH1}>
+          {done
+            ? <>All <span style={S.authH1Italic}>set.</span></>
+            : <>Choose a new <span style={S.authH1Italic}>password.</span></>}
+        </h1>
+
+        {done ? (
+          <>
+            <p style={S.authSub}>Your password has been updated. You&rsquo;re good to go.</p>
+            <button type="button" style={{ ...S.primaryBtn, marginTop: 28 }} className="rq-press"
+              onClick={onDone}>
+              Continue to your family
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={S.authSub}>Almost there — pick a new password and you&rsquo;re back in.</p>
+            <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+              <input style={S.authInput} type="password" autoComplete="new-password"
+                placeholder="New password" value={password}
+                onChange={(e) => setPassword(e.target.value)} />
+              <input style={S.authInput} type="password" autoComplete="new-password"
+                placeholder="Confirm new password" value={confirm}
+                onChange={(e) => setConfirm(e.target.value)} />
+              {err && <div style={{ ...S.authErr, marginTop: 16 }}>{err}</div>}
+              <button type="submit" style={{ ...S.primaryBtn, marginTop: 28 }} className="rq-press" disabled={busy}>
+                {busy ? '…' : 'Update password'}
+              </button>
+            </form>
+          </>
+        )}
+
+        <div style={S.authFooter}>
+          <a href="/privacy.html" target="_blank" rel="noopener" style={S.authFooterLink}>
+            Privacy Policy
+          </a>
+        </div>
+      </div>
+    </div>
+  )
+}
 function ProofInput({ onPicked, children, style, className, busy }) {
   const cameraRef = useRef(null)
   const libraryRef = useRef(null)
@@ -280,7 +395,8 @@ function ProofInput({ onPicked, children, style, className, busy }) {
 function Thumb({ url, type, size = 44 }) {
   if (!url) return <div style={{ ...S.thumbEmpty, width: size, height: size }}><ImageIcon size={16} /></div>
   return type === 'video'
-    ? <video src={url} muted playsInline style={{ ...S.thumb, width: size, height: size }} />
+    ? <video src={url} muted playsInline preload="metadata"
+        style={{ ...S.thumb, width: size, height: size, pointerEvents: 'none' }} />
     : <img src={url} alt="proof" style={{ ...S.thumb, width: size, height: size }} />
 }
 
