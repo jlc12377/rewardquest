@@ -577,6 +577,17 @@ export async function getVideos(familyId, limit = 50, kidId) {
   if (kidId) q = q.eq('kid_id', kidId)
   return await q.order('created_at', { ascending: false }).limit(limit)
 }
+/* Approved claims whose proof was a video. These live in the `claims` table
+   (separate from the `videos` table), so the Video archive merges both sources
+   to show ALL of a kid's video moments — reflections AND approved quest proofs. */
+export async function getApprovedVideoClaims(familyId, limit = 50, kidId) {
+  let q = supabase.from('claims').select('*')
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .eq('media_type', 'video')
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('created_at', { ascending: false }).limit(limit)
+}
 export async function addVideo(familyId, prompt, mediaUrl, mediaType, kidId) {
   const row = { family_id: familyId, prompt, media_url: mediaUrl, media_type: mediaType }
   if (kidId) row.kid_id = kidId
