@@ -10,7 +10,7 @@ import {
   getKid, updateKid, getKidsForFamily,
   getTasks, getDecisions, getRewards, addRow, updateRow, deleteRow,
   getPendingClaims, submitClaim, resolveClaim,
-  getVideos, addVideo, getRedemptions, addRedemption, markRedemptionFulfilled,
+  getVideos, addVideo, getApprovedVideoClaims, getRedemptions, addRedemption, markRedemptionFulfilled,
   uploadProof, subscribeFamily,
   countApprovedClaims, countVideos, countRedemptions, countApprovedToday,
   getParentRewards, addParentReward, updateParentReward, deleteParentReward,
@@ -1060,17 +1060,36 @@ function ParentApp({ familyId, user }) {
       setActiveKidId(curKid)
     }
     // fetch per-kid data scoped to the active kid
-    const [t, d, r, p, v, red] = await Promise.all([
+    const [t, d, r, p, v, red, avc] = await Promise.all([
       getTasks(familyId, curKid), getDecisions(familyId, curKid),
       getRewards(familyId, curKid), getPendingClaims(familyId, curKid),
       getVideos(familyId, 50, curKid), getRedemptions(familyId, 20, curKid),
+      getApprovedVideoClaims(familyId, 50, curKid),
     ])
     if (t.data) setTasks(t.data)
     if (d.data) setDecisions(d.data)
     if (r.data) setRewards(r.data)
     if (p.data) setPending(p.data)
-    if (v.data) setVideos(v.data)
     if (red.data) setRedemptions(red.data)
+
+    /* The Video archive shows ALL video moments: reflections (videos table)
+       AND approved quest-proof videos (claims table). A reflection is written
+       to BOTH tables, so we de-dupe by media_url to avoid showing it twice. */
+    {
+      const reflections = v.data || []
+      const claimVideos = (avc.data || []).map((c) => ({
+        id: 'claim-' + c.id,
+        media_url: c.media_url,
+        media_type: c.media_type,
+        prompt: c.label || 'Quest video',
+        created_at: c.created_at,
+        kid_id: c.kid_id,
+      }))
+      const seen = new Set(reflections.map((r2) => r2.media_url))
+      const merged = [...reflections, ...claimVideos.filter((c) => !seen.has(c.media_url))]
+      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setVideos(merged)
+    }
 
     /* recent claims (any status) for the Lately feed — scoped to active kid */
     let rcQuery = supabase.from('claims').select('*').eq('family_id', familyId)
