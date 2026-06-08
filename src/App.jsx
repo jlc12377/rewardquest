@@ -1886,7 +1886,7 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
             return (
               <div key={c.id}
                 style={isVideo ? { ...S.latelyRow, cursor: 'pointer' } : S.latelyRow}
-                onClick={isVideo ? () => setTab('video') : undefined}
+                onClick={isVideo ? () => setTab('videos') : undefined}
                 role={isVideo ? 'button' : undefined}
                 title={isVideo ? 'Watch in the Video section' : undefined}>
                 <Thumb url={c.media_url} type={c.media_type} size={44} />
