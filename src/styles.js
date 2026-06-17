@@ -1339,6 +1339,123 @@ export const S = {
     fontWeight: 500, color: "rgba(255,255,255,.85)",
     marginTop: 12, letterSpacing: 0.1,
   },
+
+  /* ---- Shared Goal ---- */
+  sharedGoalCard: {
+    background: "var(--paper)", border: "1.5px solid var(--ink)",
+    borderRadius: 18, padding: "18px 18px 16px",
+  },
+  sharedGoalHeader: { display: "flex", alignItems: "center", gap: 7, marginBottom: 8 },
+  sharedGoalTag: {
+    fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 800,
+    letterSpacing: 1.4, textTransform: "uppercase", color: "var(--mute)",
+  },
+  sharedGoalTitle: {
+    fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 600,
+    color: "var(--ink)", lineHeight: 1.15, marginBottom: 14,
+  },
+  sharedGoalBarWrap: {
+    height: 10, background: "var(--hair)", borderRadius: 99, overflow: "hidden",
+  },
+  sharedGoalBar: {
+    height: "100%", background: "var(--accent)", borderRadius: 99,
+    transition: "width .4s ease",
+  },
+  sharedGoalCount: {
+    fontFamily: "'Inter', sans-serif", fontSize: 12.5, fontWeight: 600,
+    color: "var(--mute)", marginTop: 7, marginBottom: 14,
+  },
+  sharedGoalTodayRow: { display: "flex", gap: 10, marginBottom: 12 },
+  sharedGoalDotDone: {
+    flex: 1, display: "flex", alignItems: "center", gap: 6,
+    background: "var(--ink)", color: "var(--paper)", borderRadius: 10,
+    padding: "9px 11px", fontFamily: "'Inter', sans-serif", fontSize: 12.5, fontWeight: 700,
+  },
+  sharedGoalDotOpen: {
+    flex: 1, display: "flex", alignItems: "center", gap: 6,
+    background: "transparent", color: "var(--mute)", border: "1.5px solid var(--hair)",
+    borderRadius: 10, padding: "9px 11px",
+    fontFamily: "'Inter', sans-serif", fontSize: 12.5, fontWeight: 600,
+  },
+  sharedGoalMyTask: {
+    fontFamily: "'Inter', sans-serif", fontSize: 13, color: "var(--ink)",
+    fontWeight: 500, marginBottom: 12, fontStyle: "italic",
+  },
+  sharedGoalBtn: {
+    width: "100%", background: "var(--accent)", color: "#fff", border: "none",
+    borderRadius: 12, padding: "13px", fontFamily: "'Inter', sans-serif",
+    fontSize: 14, fontWeight: 800, cursor: "pointer", letterSpacing: 0.2,
+  },
+  sharedGoalBtnDone: {
+    width: "100%", background: "transparent", color: "var(--ink)",
+    border: "1.5px solid var(--ink)", borderRadius: 12, padding: "13px",
+    fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, cursor: "pointer",
+  },
+  sharedGoalBoth: {
+    marginTop: 12, textAlign: "center", fontFamily: "'Fraunces', serif",
+    fontSize: 14, fontStyle: "italic", color: "var(--accent)",
+  },
+  /* won state */
+  sharedGoalWon: {
+    background: "var(--accent)", borderRadius: 18, padding: "22px 18px", textAlign: "center",
+  },
+  sharedGoalWonTag: {
+    fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 800,
+    letterSpacing: 1.6, textTransform: "uppercase", color: "rgba(255,255,255,.9)",
+  },
+  sharedGoalWonTitle: {
+    fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 600,
+    color: "#fff", marginTop: 8, lineHeight: 1.15,
+  },
+  sharedGoalWonItalic: { fontStyle: "italic" },
+  sharedGoalWonReward: {
+    fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
+    color: "#fff", marginTop: 12,
+  },
+  /* create prompt + edit link */
+  sgCreatePrompt: {
+    width: "100%", display: "flex", alignItems: "center", gap: 8,
+    background: "transparent", border: "1.5px dashed var(--hair)", borderRadius: 14,
+    padding: "14px 16px", marginBottom: 16, cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 13.5, fontWeight: 600,
+    color: "var(--ink)", textAlign: "left",
+  },
+  sgEditLink: {
+    background: "none", border: "none", color: "var(--mute)", cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600,
+    textDecoration: "underline", textDecorationColor: "var(--hair)",
+    marginTop: 8, padding: "4px 2px",
+  },
+  /* editor */
+  sharedGoalEditor: {
+    background: "var(--paper)", border: "1.5px solid var(--ink)",
+    borderRadius: 18, padding: 18, marginBottom: 16,
+  },
+  sharedGoalEditTitle: {
+    fontFamily: "'Fraunces', serif", fontSize: 20, fontWeight: 600, color: "var(--ink)",
+  },
+  sharedGoalEditHint: {
+    fontFamily: "'Inter', sans-serif", fontSize: 13, color: "var(--mute)",
+    margin: "6px 0 14px", lineHeight: 1.4,
+  },
+  sgLabel: {
+    display: "block", fontFamily: "'Inter', sans-serif", fontSize: 12,
+    fontWeight: 700, color: "var(--ink)", marginBottom: 5, marginTop: 12,
+  },
+  sgInput: {
+    width: "100%", boxSizing: "border-box", background: "#fff",
+    border: "1.5px solid var(--hair)", borderRadius: 10, padding: "11px 13px",
+    fontFamily: "'Inter', sans-serif", fontSize: 14, color: "var(--ink)",
+  },
+  sgEditActions: { display: "flex", justifyContent: "space-between", marginTop: 12 },
+  sgArchiveBtn: {
+    background: "none", border: "none", color: "var(--err)", cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12.5, fontWeight: 600,
+  },
+  sgCancelBtn: {
+    background: "none", border: "none", color: "var(--mute)", cursor: "pointer",
+    fontFamily: "'Inter', sans-serif", fontSize: 12.5, fontWeight: 600,
+  },
 }
 
 export const TIERS = ["Small", "Medium", "Large"]

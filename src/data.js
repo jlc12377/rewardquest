@@ -795,6 +795,97 @@ export async function getParentStreak(familyId, userId) {
   return streak
 }
 
+/* ============================================================
+   Shared Goals — a TRUE joint goal. Both parent and kid mark
+   their part each day; a day only COUNTS if both checked in.
+   Hitting target_days unlocks a shared reward.
+   ============================================================ */
+const todayStr = () => new Date().toLocaleDateString('en-CA') // YYYY-MM-DD, local
+
+export async function getSharedGoals(familyId, kidId) {
+  let q = supabase.from('shared_goals').select('*')
+    .eq('family_id', familyId)
+    .neq('status', 'archived')
+  if (kidId) q = q.eq('kid_id', kidId)
+  return await q.order('created_at', { ascending: false })
+}
+
+export async function createSharedGoal(familyId, kidId, fields) {
+  return await supabase.from('shared_goals').insert({
+    family_id: familyId,
+    kid_id: kidId || null,
+    title: fields.title,
+    parent_task: fields.parentTask || 'My part',
+    kid_task: fields.kidTask || 'My part',
+    target_days: fields.targetDays || 7,
+    reward: fields.reward || null,
+  }).select().single()
+}
+
+export async function updateSharedGoal(id, fields) {
+  return await supabase.from('shared_goals').update(fields).eq('id', id)
+}
+
+export async function archiveSharedGoal(id) {
+  return await supabase.from('shared_goals').update({ status: 'archived' }).eq('id', id)
+}
+
+/* All check-ins for a goal — used to compute progress (which days both did). */
+export async function getGoalCheckins(goalId) {
+  return await supabase.from('shared_goal_checkins').select('*').eq('goal_id', goalId)
+}
+
+/* Mark today done for one side ('parent' or 'kid'). Idempotent: the unique
+   constraint means a repeat tap for the same day just no-ops gracefully. */
+export async function checkInSharedGoal(goalId, familyId, who) {
+  return await supabase.from('shared_goal_checkins')
+    .upsert(
+      { goal_id: goalId, family_id: familyId, who, checkin_date: todayStr() },
+      { onConflict: 'goal_id,who,checkin_date', ignoreDuplicates: true }
+    )
+}
+
+/* Undo today's check-in for one side (in case of a misclick). */
+export async function undoCheckInSharedGoal(goalId, who) {
+  return await supabase.from('shared_goal_checkins')
+    .delete()
+    .eq('goal_id', goalId).eq('who', who).eq('checkin_date', todayStr())
+}
+
+/* Given a goal's check-ins, compute the shared progress:
+   - countedDays: number of distinct dates where BOTH parent & kid checked in
+   - parentToday / kidToday: did each side check in today
+   - bothToday: today is a counted day
+   Returns a plain object (no DB call). */
+export function computeGoalProgress(goal, checkins) {
+  const byDate = {}
+  for (const c of checkins) {
+    byDate[c.checkin_date] = byDate[c.checkin_date] || { parent: false, kid: false }
+    byDate[c.checkin_date][c.who] = true
+  }
+  let countedDays = 0
+  for (const date in byDate) {
+    if (byDate[date].parent && byDate[date].kid) countedDays++
+  }
+  const t = todayStr()
+  const today = byDate[t] || { parent: false, kid: false }
+  return {
+    countedDays,
+    target: goal.target_days,
+    parentToday: today.parent,
+    kidToday: today.kid,
+    bothToday: today.parent && today.kid,
+    achieved: countedDays >= goal.target_days,
+  }
+}
+
+/* Mark a goal achieved (called when countedDays first reaches target). */
+export async function markSharedGoalAchieved(id) {
+  return await supabase.from('shared_goals')
+    .update({ status: 'achieved', achieved_at: new Date().toISOString() })
+    .eq('id', id)
+}
+
 /* ---- file uploads ---- */
 export async function uploadProof(file, kind = 'proof') {
   const ext = (file.name.split('.').pop() || 'bin').toLowerCase()

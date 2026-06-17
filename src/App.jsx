@@ -16,6 +16,9 @@ import {
   getParentRewards, addParentReward, updateParentReward, deleteParentReward,
   addParentClaim, getParentClaims, countWinsThisWeek, getParentStreak, getKidStreak,
   getLevelUpStatus, getLevelUpStatusForKid, awardLevelUpBonus, applyKidBonusPoints,
+  getSharedGoals, createSharedGoal, updateSharedGoal, archiveSharedGoal,
+  getGoalCheckins, checkInSharedGoal, undoCheckInSharedGoal, computeGoalProgress,
+  markSharedGoalAchieved,
   LEVELUP_KID_POINTS_GOAL, LEVELUP_PARENT_WINS_GOAL, LEVELUP_STREAK_GOAL,
 } from './data.js'
 import { supabase } from './supabase.js'
@@ -463,6 +466,9 @@ function KidApp({ familyId, kidId, user }) {
   const [badgePop, setBadgePop] = useState(null)
   const [kidLevelUpStatus, setKidLevelUpStatus] = useState(null)
   const [kidStreakInfo, setKidStreakInfo] = useState(null)
+  const [kidSharedGoal, setKidSharedGoal] = useState(null)
+  const [kidSharedProgress, setKidSharedProgress] = useState(null)
+  const [kidSgBusy, setKidSgBusy] = useState(false)
   const seenBadgesRef = useRef(null)
   const lastPointsRef = useRef(null)
 
@@ -513,6 +519,19 @@ function KidApp({ familyId, kidId, user }) {
       const luStatus = await getLevelUpStatusForKid(familyId, kidId, derivedStreak)
       setKidLevelUpStatus(luStatus)
     }
+
+    /* shared goal (joint goal) for this kid + its progress */
+    try {
+      const { data: goals } = await getSharedGoals(familyId, kidId)
+      const goal = (goals && goals[0]) || null
+      setKidSharedGoal(goal)
+      if (goal) {
+        const { data: checkins } = await getGoalCheckins(goal.id)
+        setKidSharedProgress(computeGoalProgress(goal, checkins || []))
+      } else {
+        setKidSharedProgress(null)
+      }
+    } catch { /* non-fatal */ }
   }, [familyId, kidId])
 
   useEffect(() => { reload() }, [reload])
@@ -582,6 +601,20 @@ function KidApp({ familyId, kidId, user }) {
     reload()
   }
 
+  /* Kid marks their part of the shared goal done today (or undoes it). */
+  const onKidSharedToggle = async () => {
+    if (!kidSharedGoal) return
+    setKidSgBusy(true)
+    if (kidSharedProgress?.kidToday) {
+      await undoCheckInSharedGoal(kidSharedGoal.id, 'kid')
+    } else {
+      await checkInSharedGoal(kidSharedGoal.id, familyId, 'kid')
+      flash('You did your part! 💛')
+    }
+    setKidSgBusy(false)
+    reload()
+  }
+
   const onRedeem = async (reward) => {
     if (!kid || (kid.points || 0) < reward.cost) return
     await updateKid(kidId, { points: kid.points - reward.cost })
@@ -614,7 +647,9 @@ function KidApp({ familyId, kidId, user }) {
         {tab === 'home' && (
           <KidHome family={kid} rewards={rewards} pending={pending}
             counts={counts} setTab={setTab}
-            levelUpStatus={kidLevelUpStatus} />
+            levelUpStatus={kidLevelUpStatus}
+            sharedGoal={kidSharedGoal} sharedProgress={kidSharedProgress}
+            onSharedToggle={onKidSharedToggle} sgBusy={kidSgBusy} />
         )}
         {tab === 'tasks' && (
           <KidTasks family={kid} tasks={tasks} decisions={decisions}
@@ -679,7 +714,8 @@ function KidHeader({ family, pointsBump, streakInfo }) {
   )
 }
 
-function KidHome({ family, rewards, pending, counts, setTab, levelUpStatus }) {
+function KidHome({ family, rewards, pending, counts, setTab, levelUpStatus,
+  sharedGoal, sharedProgress, onSharedToggle, sgBusy }) {
   const sorted = [...rewards].sort((a, b) => a.cost - b.cost)
   const next = sorted.find((r) => r.cost > (family.points || 0)) || sorted[sorted.length - 1]
   const pct = next ? Math.min(100, Math.round((family.points / next.cost) * 100)) : 0
@@ -761,6 +797,12 @@ function KidHome({ family, rewards, pending, counts, setTab, levelUpStatus }) {
         </div>
       </div>
 
+      {sharedGoal && (
+        <div style={{ marginBottom: 16 }}>
+          <SharedGoalCard goal={sharedGoal} progress={sharedProgress}
+            side="kid" onToggleToday={onSharedToggle} busy={sgBusy} />
+        </div>
+      )}
       <LevelUpCard status={levelUpStatus} kidName={firstName} viewMode="kid" />
 
       <div style={S.eyebrow}>
@@ -1040,6 +1082,11 @@ function ParentApp({ familyId, user }) {
   const [parentClaims, setParentClaims] = useState([])
   const [wins, setWins] = useState(0)
   const [parentStreak, setParentStreak] = useState(0)
+  /* Shared goal: the goal + its computed progress, plus editor visibility */
+  const [sharedGoal, setSharedGoal] = useState(null)
+  const [sharedProgress, setSharedProgress] = useState(null)
+  const [sgEditing, setSgEditing] = useState(false)
+  const [sgBusy, setSgBusy] = useState(false)
   /* Level Up Together — shared bonus mechanic. Status is recomputed on each reload. */
   const [levelUpStatus, setLevelUpStatus] = useState(null)
   const [levelUpJustWon, setLevelUpJustWon] = useState(false)
@@ -1099,6 +1146,24 @@ function ParentApp({ familyId, user }) {
     if (curKid) rcQuery = rcQuery.eq('kid_id', curKid)
     const { data: rc } = await rcQuery
     if (rc) setRecentClaims(rc)
+
+    /* shared goal — the active joint goal for this kid, plus its progress */
+    try {
+      const { data: goals } = await getSharedGoals(familyId, curKid)
+      const goal = (goals && goals[0]) || null
+      setSharedGoal(goal)
+      if (goal) {
+        const { data: checkins } = await getGoalCheckins(goal.id)
+        const prog = computeGoalProgress(goal, checkins || [])
+        setSharedProgress(prog)
+        /* auto-mark achieved the first time the target is reached */
+        if (prog.achieved && goal.status !== 'achieved') {
+          await markSharedGoalAchieved(goal.id)
+        }
+      } else {
+        setSharedProgress(null)
+      }
+    } catch { /* non-fatal — shared goal is additive */ }
 
     /* this-week stats — scoped to active kid */
     const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString()
@@ -1196,6 +1261,41 @@ function ParentApp({ familyId, user }) {
   const onFulfill = async (id) => {
     await markRedemptionFulfilled(id)
     flash('Marked as given')
+    reload()
+  }
+
+  /* ---- Shared goal handlers (parent side) ---- */
+  const onSharedToggle = async () => {
+    if (!sharedGoal) return
+    setSgBusy(true)
+    if (sharedProgress?.parentToday) {
+      await undoCheckInSharedGoal(sharedGoal.id, 'parent')
+    } else {
+      await checkInSharedGoal(sharedGoal.id, familyId, 'parent')
+      flash('Your part — done 💛')
+    }
+    setSgBusy(false)
+    reload()
+  }
+  const onSharedSave = async (fields) => {
+    setSgBusy(true)
+    if (sharedGoal) {
+      await updateSharedGoal(sharedGoal.id, {
+        title: fields.title, parent_task: fields.parentTask,
+        kid_task: fields.kidTask, target_days: fields.targetDays, reward: fields.reward,
+      })
+    } else {
+      await createSharedGoal(familyId, activeKidId, fields)
+    }
+    setSgBusy(false)
+    setSgEditing(false)
+    flash('Shared goal saved')
+    reload()
+  }
+  const onSharedArchive = async () => {
+    if (sharedGoal) await archiveSharedGoal(sharedGoal.id)
+    setSgEditing(false)
+    flash('Goal ended')
     reload()
   }
 
@@ -1310,7 +1410,14 @@ function ParentApp({ familyId, user }) {
         {tab === 'home' && viewMode === 'kid' && (
           <ParentHome family={familyForView} pending={pending} videos={videos}
             rewards={rewards} redemptions={redemptions} recentClaims={recentClaims}
-            counts={counts} setTab={setTab} />
+            counts={counts} setTab={setTab}
+            sharedGoal={sharedGoal} sharedProgress={sharedProgress}
+            onSharedToggle={onSharedToggle} sgBusy={sgBusy}
+            onSharedEdit={() => setSgEditing(true)} sgEditing={sgEditing}
+            sgEditor={
+              <SharedGoalEditor existing={sharedGoal} onSave={onSharedSave}
+                onArchive={onSharedArchive} onCancel={() => setSgEditing(false)} busy={sgBusy} />
+            } />
         )}
         {tab === 'approvals' && (
           <ParentApprovals pending={pending} onApprove={onApprove} onDecline={onDecline} />
@@ -1495,6 +1602,145 @@ function KidSwitcher({ kids, viewMode, setViewMode, activeKidId, setActiveKidId,
    "Wins" = approvals attributed to this parent in the past 7 days.
    Rewards UNLOCK at threshold but don't deduct wins (recurring weekly).
    ============================================================ */
+/* ============================================================
+   SHARED GOAL — a true joint goal. Both sides check in daily;
+   a day counts only if both did. Shown on both home screens.
+   `side` is 'parent' or 'kid' — controls which check-in it toggles.
+   ============================================================ */
+function SharedGoalCard({ goal, progress, side, onToggleToday, busy }) {
+  if (!goal || !progress) return null
+  const pct = Math.min(100, Math.round((progress.countedDays / progress.target) * 100))
+  const mine = side === 'parent' ? progress.parentToday : progress.kidToday
+  const theirs = side === 'parent' ? progress.kidToday : progress.parentToday
+  const myTask = side === 'parent' ? goal.parent_task : goal.kid_task
+  const theirLabel = side === 'parent' ? 'Them' : 'Grown-up'
+
+  if (progress.achieved) {
+    return (
+      <div style={S.sharedGoalWon}>
+        <div style={S.sharedGoalWonTag}>YOU DID IT — TOGETHER</div>
+        <div style={S.sharedGoalWonTitle}>
+          {goal.title} <span style={S.sharedGoalWonItalic}>done.</span>
+        </div>
+        {goal.reward && (
+          <div style={S.sharedGoalWonReward}>🎉 Time to enjoy: {goal.reward}</div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={S.sharedGoalCard}>
+      <div style={S.sharedGoalHeader}>
+        <Heart size={15} style={{ color: 'var(--accent)' }} />
+        <span style={S.sharedGoalTag}>OUR SHARED GOAL</span>
+      </div>
+      <div style={S.sharedGoalTitle}>{goal.title}</div>
+
+      <div style={S.sharedGoalBarWrap}>
+        <div style={{ ...S.sharedGoalBar, width: `${pct}%` }} />
+      </div>
+      <div style={S.sharedGoalCount}>
+        {progress.countedDays} of {progress.target} days we both showed up
+      </div>
+
+      {/* today's two-sided status */}
+      <div style={S.sharedGoalTodayRow}>
+        <div style={mine ? S.sharedGoalDotDone : S.sharedGoalDotOpen}>
+          {mine ? <Check size={14} /> : <Circle size={13} />}
+          <span>You {mine ? 'did it' : 'today'}</span>
+        </div>
+        <div style={theirs ? S.sharedGoalDotDone : S.sharedGoalDotOpen}>
+          {theirs ? <Check size={14} /> : <Circle size={13} />}
+          <span>{theirLabel} {theirs ? 'did it' : 'pending'}</span>
+        </div>
+      </div>
+
+      <div style={S.sharedGoalMyTask}>{myTask}</div>
+
+      <button
+        type="button"
+        onClick={onToggleToday}
+        disabled={busy}
+        className="rq-press"
+        style={mine ? S.sharedGoalBtnDone : S.sharedGoalBtn}>
+        {busy ? '…' : mine ? 'Done today ✓ (tap to undo)' : 'Mark my part done today'}
+      </button>
+
+      {progress.bothToday && (
+        <div style={S.sharedGoalBoth}>You both showed up today. That's the whole point. 💛</div>
+      )}
+    </div>
+  )
+}
+
+/* Parent-only editor to create or edit the shared goal. */
+function SharedGoalEditor({ existing, onSave, onArchive, onCancel, busy }) {
+  const [title, setTitle] = useState(existing?.title || '')
+  const [parentTask, setParentTask] = useState(existing?.parent_task || '')
+  const [kidTask, setKidTask] = useState(existing?.kid_task || '')
+  const [targetDays, setTargetDays] = useState(existing?.target_days || 7)
+  const [reward, setReward] = useState(existing?.reward || '')
+  const [err, setErr] = useState(null)
+
+  const save = () => {
+    if (!title.trim()) { setErr('Give your goal a name'); return }
+    if (!parentTask.trim() || !kidTask.trim()) { setErr('Add what each of you will do'); return }
+    setErr(null)
+    onSave({
+      title: title.trim(),
+      parentTask: parentTask.trim(),
+      kidTask: kidTask.trim(),
+      targetDays: Math.max(1, parseInt(targetDays) || 7),
+      reward: reward.trim() || null,
+    })
+  }
+
+  return (
+    <div style={S.sharedGoalEditor}>
+      <div style={S.sharedGoalEditTitle}>
+        {existing ? 'Edit your shared goal' : 'Create a shared goal'}
+      </div>
+      <p style={S.sharedGoalEditHint}>
+        Something you'll both work on, together. A day only counts when you BOTH do your part.
+      </p>
+
+      <label style={S.sgLabel}>What's the goal?</label>
+      <input style={S.sgInput} value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="e.g. Keep our spaces tidy" />
+
+      <label style={S.sgLabel}>Your part (the grown-up)</label>
+      <input style={S.sgInput} value={parentTask} onChange={(e) => setParentTask(e.target.value)}
+        placeholder="e.g. Tidy my room before bed" />
+
+      <label style={S.sgLabel}>Their part (the kid)</label>
+      <input style={S.sgInput} value={kidTask} onChange={(e) => setKidTask(e.target.value)}
+        placeholder="e.g. Tidy my room before bed" />
+
+      <label style={S.sgLabel}>How many days do you want to do it together?</label>
+      <input style={S.sgInput} type="number" min="1" value={targetDays}
+        onChange={(e) => setTargetDays(e.target.value)} />
+
+      <label style={S.sgLabel}>Your shared reward when you hit it (optional)</label>
+      <input style={S.sgInput} value={reward} onChange={(e) => setReward(e.target.value)}
+        placeholder="e.g. Movie night, just us" />
+
+      {err && <div style={S.authErr}>{err}</div>}
+
+      <button type="button" className="rq-press" style={{ ...S.primaryBtn, marginTop: 16 }}
+        onClick={save} disabled={busy}>
+        {busy ? '…' : existing ? 'Save changes' : 'Start our goal'}
+      </button>
+      <div style={S.sgEditActions}>
+        {existing && (
+          <button type="button" style={S.sgArchiveBtn} onClick={onArchive}>End this goal</button>
+        )}
+        <button type="button" style={S.sgCancelBtn} onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
 /* ============================================================
    LEVEL UP TOGETHER — shared card showing weekly progress
    for kid and parent, with bonus celebration when earned.
@@ -1773,7 +2019,8 @@ function ParentMeEdit({ parentRewards, onSave, onDelete }) {
   )
 }
 
-function ParentHome({ family, pending, videos, rewards, redemptions, recentClaims, counts, setTab }) {
+function ParentHome({ family, pending, videos, rewards, redemptions, recentClaims, counts, setTab,
+  sharedGoal, sharedProgress, onSharedToggle, sgBusy, onSharedEdit, sgEditing, sgEditor }) {
   const [viewing, setViewing] = useState(null)
   const dayName = new Date().toLocaleDateString(undefined, { weekday: 'long' })
   const dateStr = new Date().toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
@@ -1798,6 +2045,22 @@ function ParentHome({ family, pending, videos, rewards, redemptions, recentClaim
         <div style={S.parentGreetH}>How's she doing.</div>
         <div style={S.parentGreetSub}>{greetSub}</div>
       </div>
+
+      {/* Shared goal — the joint "we're in it together" card */}
+      {sgEditing ? sgEditor : sharedGoal ? (
+        <div style={{ marginBottom: 16 }}>
+          <SharedGoalCard goal={sharedGoal} progress={sharedProgress}
+            side="parent" onToggleToday={onSharedToggle} busy={sgBusy} />
+          <button type="button" style={S.sgEditLink} onClick={onSharedEdit}>
+            Edit our goal
+          </button>
+        </div>
+      ) : (
+        <button type="button" style={S.sgCreatePrompt} onClick={onSharedEdit}>
+          <Heart size={15} style={{ color: 'var(--accent)' }} />
+          <span>Start a goal you'll work on <i>together</i> →</span>
+        </button>
+      )}
 
       <div style={S.weekBand}>
         <div style={S.weekCell}>
