@@ -1060,16 +1060,16 @@ export const S = {
     fontStyle: "italic", color: "var(--accent)", fontWeight: 400,
   },
   parentStatRow: {
-    display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14,
+    display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10,
     marginBottom: 20,
   },
   parentStatBig: {
     background: "var(--paper)", border: "1px solid var(--hair)",
-    borderRadius: 4, padding: "16px 18px",
+    borderRadius: 4, padding: "14px 12px",
   },
   parentStatNum: {
     fontFamily: "'Fraunces', serif", fontWeight: 400,
-    fontSize: 56, lineHeight: 0.95, letterSpacing: "-0.04em",
+    fontSize: 42, lineHeight: 0.95, letterSpacing: "-0.04em",
     color: "var(--ink)", fontVariationSettings: "'opsz' 144",
   },
   parentStatLabel: {

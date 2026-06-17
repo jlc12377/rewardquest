@@ -14,7 +14,7 @@ import {
   uploadProof, subscribeFamily,
   countApprovedClaims, countVideos, countRedemptions, countApprovedToday,
   getParentRewards, addParentReward, updateParentReward, deleteParentReward,
-  addParentClaim, getParentClaims, countWinsThisWeek, getParentStreak, getKidStreak,
+  addParentClaim, getParentClaims, countWinsThisWeek, countWinsAllTime, getParentStreak, getKidStreak,
   getLevelUpStatus, getLevelUpStatusForKid, awardLevelUpBonus, applyKidBonusPoints,
   getSharedGoals, createSharedGoal, updateSharedGoal, archiveSharedGoal,
   getGoalCheckins, checkInSharedGoal, undoCheckInSharedGoal, computeGoalProgress,
@@ -1081,6 +1081,7 @@ function ParentApp({ familyId, user }) {
   const [parentRewards, setParentRewards] = useState([])
   const [parentClaims, setParentClaims] = useState([])
   const [wins, setWins] = useState(0)
+  const [winsTotal, setWinsTotal] = useState(0)
   const [parentStreak, setParentStreak] = useState(0)
   /* Shared goal: the goal + its computed progress, plus editor visibility */
   const [sharedGoal, setSharedGoal] = useState(null)
@@ -1184,15 +1185,17 @@ function ParentApp({ familyId, user }) {
     })
 
     /* Parent-specific data — wins, streak, rewards, claim history */
-    const [pr, pc, w, str] = await Promise.all([
+    const [pr, pc, w, wAll, str] = await Promise.all([
       getParentRewards(user.id),
       getParentClaims(user.id, 30),
       countWinsThisWeek(familyId, user.id),
+      countWinsAllTime(familyId, user.id),
       getParentStreak(familyId, user.id),
     ])
     if (pr.data) setParentRewards(pr.data)
     if (pc.data) setParentClaims(pc.data)
     setWins(w || 0)
+    setWinsTotal(wAll || 0)
     setParentStreak(str || 0)
 
     /* Level Up Together — check shared status. If both sides have hit eligibility
@@ -1398,7 +1401,7 @@ function ParentApp({ familyId, user }) {
 
         {tab === 'home' && viewMode === 'me' && (
           <ParentMe
-            wins={wins} streak={parentStreak}
+            wins={wins} winsTotal={winsTotal} streak={parentStreak}
             parentRewards={parentRewards}
             parentClaims={parentClaims}
             onRedeem={onParentRedeem}
@@ -1833,7 +1836,7 @@ function LevelUpCard({ status, kidName, viewMode }) {
   )
 }
 
-function ParentMe({ wins, streak, parentRewards, parentClaims, onRedeem, setTab, levelUpStatus, activeKid }) {
+function ParentMe({ wins, winsTotal, streak, parentRewards, parentClaims, onRedeem, setTab, levelUpStatus, activeKid }) {
   /* Group rewards by tier for visual hierarchy */
   const byTier = { Daily: [], Weekly: [], Monthly: [] }
   ;(parentRewards || []).forEach(r => {
@@ -1871,6 +1874,10 @@ function ParentMe({ wins, streak, parentRewards, parentClaims, onRedeem, setTab,
         <div style={S.parentStatBig}>
           <div style={S.parentStatNum}>{wins}</div>
           <div style={S.parentStatLabel}>wins this week</div>
+        </div>
+        <div style={S.parentStatBig}>
+          <div style={S.parentStatNum}>{winsTotal != null ? winsTotal : wins}</div>
+          <div style={S.parentStatLabel}>wins all-time</div>
         </div>
         <div style={S.parentStatBig}>
           <div style={S.parentStatNum}>{streak}</div>

@@ -673,6 +673,24 @@ export async function countWinsThisWeek(familyId, userId) {
   return (attributed || 0) + (legacy || 0)
 }
 
+/* Lifetime wins — same attribution as countWinsThisWeek (this parent's
+   approvals + legacy unattributed approved claims), with no date window.
+   Shown alongside the weekly count so a parent sees their full consistency,
+   not just the last 7 days. */
+export async function countWinsAllTime(familyId, userId) {
+  const { count: attributed } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .eq('approver_user_id', userId)
+  const { count: legacy } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId)
+    .eq('status', 'approved')
+    .is('approver_user_id', null)
+  return (attributed || 0) + (legacy || 0)
+}
+
 /* ----------------------------------------------------------------
    KID STREAK — "one good choice a day," derived live (not stored).
 
