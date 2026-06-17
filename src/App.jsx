@@ -15,6 +15,7 @@ import {
   countApprovedClaims, countVideos, countRedemptions, countApprovedToday,
   getParentRewards, addParentReward, updateParentReward, deleteParentReward,
   addParentClaim, getParentClaims, countWinsThisWeek, countWinsAllTime, getParentStreak, getKidStreak,
+  getBucketWins, computeBucketSpend,
   getLevelUpStatus, getLevelUpStatusForKid, awardLevelUpBonus, applyKidBonusPoints,
   getSharedGoals, createSharedGoal, updateSharedGoal, archiveSharedGoal,
   getGoalCheckins, checkInSharedGoal, undoCheckInSharedGoal, computeGoalProgress,
@@ -1083,6 +1084,8 @@ function ParentApp({ familyId, user }) {
   const [wins, setWins] = useState(0)
   const [winsTotal, setWinsTotal] = useState(0)
   const [parentStreak, setParentStreak] = useState(0)
+  const [bucketWins, setBucketWins] = useState({ daily: 0, weekly: 0, monthly: 0 })
+  const [bucketSpend, setBucketSpend] = useState({ daily: 0, weekly: 0, monthly: 0 })
   /* Shared goal: the goal + its computed progress, plus editor visibility */
   const [sharedGoal, setSharedGoal] = useState(null)
   const [sharedProgress, setSharedProgress] = useState(null)
@@ -1185,18 +1188,22 @@ function ParentApp({ familyId, user }) {
     })
 
     /* Parent-specific data — wins, streak, rewards, claim history */
-    const [pr, pc, w, wAll, str] = await Promise.all([
+    const [pr, pc, w, wAll, str, bw] = await Promise.all([
       getParentRewards(user.id),
-      getParentClaims(user.id, 30),
+      getParentClaims(user.id, 60),
       countWinsThisWeek(familyId, user.id),
       countWinsAllTime(familyId, user.id),
       getParentStreak(familyId, user.id),
+      getBucketWins(familyId, user.id),
     ])
     if (pr.data) setParentRewards(pr.data)
     if (pc.data) setParentClaims(pc.data)
     setWins(w || 0)
     setWinsTotal(wAll || 0)
     setParentStreak(str || 0)
+    setBucketWins(bw || { daily: 0, weekly: 0, monthly: 0 })
+    /* how much each bucket has been spent this period (needs rewards + claims) */
+    setBucketSpend(computeBucketSpend(pc.data || [], pr.data || []))
 
     /* Level Up Together — check shared status. If both sides have hit eligibility
        this week AND we haven't already awarded the bonus, award it now and apply
@@ -1302,10 +1309,14 @@ function ParentApp({ familyId, user }) {
     reload()
   }
 
-  /* Parent celebrates an unlocked reward — logs to parent_claims for history. */
+  /* Parent celebrates an unlocked reward — logs to parent_claims for history.
+     Availability is per-bucket: a daily reward draws on today's wins, weekly on
+     this week's, monthly on this month's. */
   const onParentRedeem = async (reward) => {
-    if (wins < (reward.threshold || 0)) {
-      flash(`Need ${(reward.threshold || 0) - wins} more wins`)
+    const tierKey = (reward.tier || 'daily').toLowerCase()
+    const avail = Math.max(0, (bucketWins[tierKey] || 0) - (bucketSpend[tierKey] || 0))
+    if (avail < (reward.threshold || 0)) {
+      flash(`Need ${(reward.threshold || 0) - avail} more ${tierKey} win${(reward.threshold || 0) - avail === 1 ? '' : 's'}`)
       return
     }
     await addParentClaim(familyId, user.id, reward)
@@ -1402,6 +1413,7 @@ function ParentApp({ familyId, user }) {
         {tab === 'home' && viewMode === 'me' && (
           <ParentMe
             wins={wins} winsTotal={winsTotal} streak={parentStreak}
+            bucketWins={bucketWins} bucketSpend={bucketSpend}
             parentRewards={parentRewards}
             parentClaims={parentClaims}
             onRedeem={onParentRedeem}
@@ -1836,28 +1848,37 @@ function LevelUpCard({ status, kidName, viewMode }) {
   )
 }
 
-function ParentMe({ wins, winsTotal, streak, parentRewards, parentClaims, onRedeem, setTab, levelUpStatus, activeKid }) {
-  /* Group rewards by tier for visual hierarchy */
-  const byTier = { Daily: [], Weekly: [], Monthly: [] }
+function ParentMe({ wins, winsTotal, streak, parentRewards, parentClaims, onRedeem, setTab, levelUpStatus, activeKid, bucketWins, bucketSpend }) {
+  /* Each tier (daily/weekly/monthly) is its own bucket of wins on its own
+     reset clock. Available = wins earned this period − wins already spent
+     on claims this period. One win fills all three buckets at once. */
+  const buckets = bucketWins || { daily: 0, weekly: 0, monthly: 0 }
+  const spent = bucketSpend || { daily: 0, weekly: 0, monthly: 0 }
+  const availFor = (tierKey) => Math.max(0, (buckets[tierKey] || 0) - (spent[tierKey] || 0))
+
+  const TIER_META = {
+    daily:   { label: 'Daily treats',   sub: 'Resets every day',     reset: 'today' },
+    weekly:  { label: 'Weekly rewards', sub: 'Resets every Monday',  reset: 'this week' },
+    monthly: { label: 'Monthly goals',  sub: 'Resets on the 1st',    reset: 'this month' },
+  }
+
+  const byTier = { daily: [], weekly: [], monthly: [] }
   ;(parentRewards || []).forEach(r => {
-    const t = r.tier || 'Daily'
-    if (!byTier[t]) byTier[t] = []
-    byTier[t].push(r)
+    const t = (r.tier || 'daily').toLowerCase()
+    const key = (t in byTier) ? t : 'daily'
+    byTier[key].push(r)
   })
 
-  /* Track which rewards have been celebrated in the past 7 days (the "claimed" set) */
-  const sevenDaysAgo = Date.now() - 7 * 864e5
-  const claimedRecentIds = new Set(
-    (parentClaims || [])
-      .filter(c => new Date(c.created_at).getTime() > sevenDaysAgo && c.reward_id)
-      .map(c => c.reward_id)
-  )
-
-  /* Find the closest next unlock for the inspirational stat at the top */
-  const sortedByGap = [...(parentRewards || [])]
-    .filter(r => wins < r.threshold)
-    .sort((a, b) => (a.threshold - wins) - (b.threshold - wins))
-  const nextUnlock = sortedByGap[0]
+  /* Closest next unlock across all tiers, for the inspirational banner. */
+  const allWithGap = []
+  for (const key of ['daily', 'weekly', 'monthly']) {
+    for (const r of byTier[key]) {
+      const gap = r.threshold - availFor(key)
+      if (gap > 0) allWithGap.push({ r, gap, key })
+    }
+  }
+  allWithGap.sort((a, b) => a.gap - b.gap)
+  const nextUnlock = allWithGap[0]?.r
 
   const kidDisplayName = (activeKid && activeKid.name && activeKid.name !== 'Kid' && activeKid.name !== 'My family')
     ? activeKid.name : 'Kid'
@@ -1895,43 +1916,42 @@ function ParentMe({ wins, winsTotal, streak, parentRewards, parentClaims, onRede
             <div style={S.parentNextLabel}>Next unlock</div>
             <div style={S.parentNextTitle}>{nextUnlock.label}</div>
             <div style={S.parentNextHint}>
-              {nextUnlock.threshold - wins} more {nextUnlock.threshold - wins === 1 ? 'win' : 'wins'} to go
+              {allWithGap[0].gap} more {allWithGap[0].gap === 1 ? 'win' : 'wins'} to go
             </div>
           </div>
         </div>
       )}
 
-      {/* Reward shelves, grouped by tier */}
-      {['Daily', 'Weekly', 'Monthly'].map(tier => {
-        const items = byTier[tier] || []
+      {/* Reward shelves — one bucket per tier, each on its own reset clock */}
+      {['daily', 'weekly', 'monthly'].map(tierKey => {
+        const items = byTier[tierKey] || []
         if (items.length === 0) return null
+        const meta = TIER_META[tierKey]
+        const avail = availFor(tierKey)
         return (
-          <div key={tier} style={{ marginBottom: 22 }}>
-            <div style={S.sectionTag}>
-              <span style={{ ...S.tierDot, background: 'var(--accent)' }} />
-              {tier}
+          <div key={tierKey} style={{ marginBottom: 22 }}>
+            <div style={S.bucketHead}>
+              <div style={S.bucketHeadLeft}>
+                <span style={{ ...S.tierDot, background: 'var(--accent)' }} />
+                <span>{meta.label}</span>
+              </div>
+              <span style={S.bucketAvail}>{avail} win{avail !== 1 ? 's' : ''} {meta.reset}</span>
             </div>
+            <div style={S.bucketSub}>{meta.sub}</div>
             {items.map(r => {
-              const unlocked = wins >= r.threshold
-              const celebrated = claimedRecentIds.has(r.id)
+              const unlocked = avail >= r.threshold
               return (
                 <div key={r.id} style={S.parentRewardRow}>
                   <span style={S.parentRewardEmoji}>{r.emoji || '🌟'}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={S.parentRewardLabel}>{r.label}</div>
-                    <div style={S.parentRewardMeta}>{r.threshold} wins</div>
+                    <div style={S.parentRewardMeta}>{r.threshold} win{r.threshold !== 1 ? 's' : ''}</div>
                   </div>
-                  {celebrated ? (
-                    <span style={S.parentRewardCelebrated}>
-                      <Check size={14} /> Treated
-                    </span>
-                  ) : (
-                    <button onClick={() => onRedeem(r)} disabled={!unlocked}
-                      style={{ ...S.parentRedeemBtn, ...(unlocked ? {} : S.parentRedeemLocked) }}
-                      className="rq-press">
-                      {unlocked ? <span style={{ color: '#fff' }}>Treat me</span> : <Lock size={13} />}
-                    </button>
-                  )}
+                  <button onClick={() => onRedeem(r)} disabled={!unlocked}
+                    style={{ ...S.parentRedeemBtn, ...(unlocked ? {} : S.parentRedeemLocked) }}
+                    className="rq-press">
+                    {unlocked ? <span style={{ color: '#fff' }}>Treat me</span> : <Lock size={13} />}
+                  </button>
                 </div>
               )
             })}
@@ -1955,37 +1975,50 @@ function ParentMe({ wins, winsTotal, streak, parentRewards, parentClaims, onRede
 function ParentMeEdit({ parentRewards, onSave, onDelete }) {
   const [label, setLabel] = useState('')
   const [emoji, setEmoji] = useState('🌟')
-  const [threshold, setThreshold] = useState(5)
-  const [tier, setTier] = useState('Daily')
+  const [threshold, setThreshold] = useState(3)
+  const [tier, setTier] = useState('daily')
   const [editingId, setEditingId] = useState(null)
   const [draft, setDraft] = useState({})
 
   const add = async () => {
     const text = label.trim()
     if (!text) return
-    await onSave({ label: text, emoji, threshold: parseInt(threshold, 10) || 5, tier })
-    setLabel(''); setEmoji('🌟'); setThreshold(5); setTier('Daily')
+    await onSave({ label: text, emoji, threshold: parseInt(threshold, 10) || 3, tier })
+    setLabel(''); setEmoji('🌟'); setThreshold(3); setTier('daily')
   }
-  const beginEdit = (r) => { setEditingId(r.id); setDraft({ ...r }) }
+  const beginEdit = (r) => { setEditingId(r.id); setDraft({ ...r, tier: (r.tier || 'daily').toLowerCase() }) }
   const commitEdit = async () => {
     if (!draft.label || !draft.label.trim()) return
-    await onSave({ id: editingId, ...draft, threshold: parseInt(draft.threshold, 10) || 5 })
+    await onSave({ id: editingId, ...draft, threshold: parseInt(draft.threshold, 10) || 3 })
     setEditingId(null)
   }
+
+  const tierLabel = (t) => ({ daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' }[(t || 'daily').toLowerCase()] || 'Daily')
 
   return (
     <div className="rq-fade">
       <h2 style={S.h2}>My rewards</h2>
-      <p style={S.sectionHint}>Pick the little wins that motivate you. Set the threshold — that's how many approvals it takes to unlock that reward each week.</p>
+      <p style={S.sectionHint}>
+        Pick the little wins that motivate you. The threshold is how many approvals
+        unlock a reward — and each bucket refills on its own clock: <b>daily</b> resets
+        every day, <b>weekly</b> every Monday, <b>monthly</b> on the 1st. One approval
+        counts toward all three.
+      </p>
 
       {parentRewards.map(r => editingId === r.id ? (
-        <div key={r.id} style={S.editRow}>
+        <div key={r.id} style={{ ...S.editRow, flexWrap: 'wrap' }}>
           <input value={draft.emoji} onChange={(e) => setDraft({ ...draft, emoji: e.target.value })}
             style={{ ...S.editInput, width: 50, textAlign: 'center' }} />
           <input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })}
             style={S.editInput} placeholder="Reward" />
           <input value={draft.threshold} onChange={(e) => setDraft({ ...draft, threshold: e.target.value })}
             style={S.editPts} type="number" inputMode="numeric" />
+          <select value={(draft.tier || 'daily').toLowerCase()} onChange={(e) => setDraft({ ...draft, tier: e.target.value })}
+            style={S.tierSelect}>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
           <button onClick={commitEdit} style={S.iconBtnGo} className="rq-press">
             <Check size={15} />
           </button>
@@ -1995,7 +2028,7 @@ function ParentMeEdit({ parentRewards, onSave, onDelete }) {
           <span style={S.parentRewardEmoji}>{r.emoji || '🌟'}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={S.parentRewardLabel}>{r.label}</div>
-            <div style={S.parentRewardMeta}>{r.tier} · {r.threshold} wins</div>
+            <div style={S.parentRewardMeta}>{tierLabel(r.tier)} · {r.threshold} win{r.threshold !== 1 ? 's' : ''}</div>
           </div>
           <button onClick={() => beginEdit(r)} style={S.iconBtnEdit} className="rq-press" aria-label="Edit">
             <Pencil size={14} />
@@ -2012,15 +2045,15 @@ function ParentMeEdit({ parentRewards, onSave, onDelete }) {
         <input value={label} onChange={(e) => setLabel(e.target.value)}
           style={S.editInput} placeholder="New reward" />
         <input value={threshold} onChange={(e) => setThreshold(e.target.value)}
-          style={S.editPts} type="number" inputMode="numeric" placeholder="5" />
+          style={S.editPts} type="number" inputMode="numeric" placeholder="3" />
         <button onClick={add} style={S.iconBtnGo} className="rq-press" aria-label="Add">
           <Plus size={15} />
         </button>
       </div>
       <select value={tier} onChange={(e) => setTier(e.target.value)} style={S.tierSelect}>
-        <option value="Daily">Daily</option>
-        <option value="Weekly">Weekly</option>
-        <option value="Monthly">Monthly</option>
+        <option value="daily">Daily bucket — resets every day</option>
+        <option value="weekly">Weekly bucket — resets Mondays</option>
+        <option value="monthly">Monthly bucket — resets on the 1st</option>
       </select>
     </div>
   )

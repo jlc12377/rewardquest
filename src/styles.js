@@ -355,6 +355,23 @@ export const S = {
   },
   sectionHint: { fontSize: 13, color: "var(--mute)", fontWeight: 400, margin: "0 0 16px", lineHeight: 1.5 },
   tierDot: { width: 8, height: 8, borderRadius: "50%", display: "inline-block" },
+  bucketHead: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    marginBottom: 2,
+  },
+  bucketHeadLeft: {
+    display: "flex", alignItems: "center", gap: 8,
+    fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 800,
+    letterSpacing: 1.2, textTransform: "uppercase", color: "var(--ink)",
+  },
+  bucketAvail: {
+    fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 800,
+    color: "var(--accent)",
+  },
+  bucketSub: {
+    fontFamily: "'Inter', sans-serif", fontSize: 11.5, fontWeight: 500,
+    color: "var(--mute)", marginBottom: 12, marginLeft: 16,
+  },
 
   /* ===== task rows ===== */
   taskRow: {

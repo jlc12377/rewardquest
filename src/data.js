@@ -647,6 +647,30 @@ export async function getParentClaims(userId, limit = 30) {
     .order('created_at', { ascending: false }).limit(limit)
 }
 
+/* Given the parent's recent claims (from getParentClaims) and the reward list,
+   compute how many wins each bucket has "spent" this period — i.e. claims made
+   since each bucket's period start. Pure function, no DB call. Each claim costs
+   that reward's threshold worth of wins from its own bucket. */
+export function computeBucketSpend(parentClaims, rewards) {
+  const rewardById = {}
+  for (const r of (rewards || [])) rewardById[r.id] = r
+  const spend = { daily: 0, weekly: 0, monthly: 0 }
+  const starts = {
+    daily: periodStart('daily').getTime(),
+    weekly: periodStart('weekly').getTime(),
+    monthly: periodStart('monthly').getTime(),
+  }
+  for (const c of (parentClaims || [])) {
+    const r = rewardById[c.reward_id]
+    if (!r) continue
+    const tier = (r.tier || 'daily').toLowerCase()
+    if (!(tier in spend)) continue
+    const when = new Date(c.created_at).getTime()
+    if (when >= starts[tier]) spend[tier] += (r.threshold || 0)
+  }
+  return spend
+}
+
 /* ---- parent wins counters ----
    Counts claims this parent has approved within the given window.
    We attribute wins via `approver_user_id` going forward;
@@ -671,6 +695,54 @@ export async function countWinsThisWeek(familyId, userId) {
     .gte('resolved_at', weekAgo)
     .is('approver_user_id', null)
   return (attributed || 0) + (legacy || 0)
+}
+
+/* ----------------------------------------------------------------
+   REWARD BUCKETS — daily / weekly / monthly parent reward tiers.
+   Each tier is a window over the SAME stream of approved wins:
+     - daily   : since local midnight today
+     - weekly  : since Monday 00:00 this week
+     - monthly : since the 1st of this month
+   One win fills all three at once. Each bucket also tracks how many
+   rewards have been CLAIMED within its own window, so claiming a daily
+   treat doesn't touch weekly/monthly progress, and each resets on its
+   own clock.
+---------------------------------------------------------------- */
+export function periodStart(period, now = new Date()) {
+  const d = new Date(now)
+  d.setHours(0, 0, 0, 0)                 // local midnight
+  if (period === 'daily') return d
+  if (period === 'weekly') {
+    const dow = (d.getDay() + 6) % 7      // Mon=0 … Sun=6
+    d.setDate(d.getDate() - dow)
+    return d
+  }
+  if (period === 'monthly') { d.setDate(1); return d }
+  return d
+}
+
+/* Count this parent's approved wins since a given Date. */
+export async function countWinsSince(familyId, userId, since) {
+  const iso = since.toISOString()
+  const { count: attributed } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId).eq('status', 'approved')
+    .gte('resolved_at', iso).eq('approver_user_id', userId)
+  const { count: legacy } = await supabase.from('claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('family_id', familyId).eq('status', 'approved')
+    .gte('resolved_at', iso).is('approver_user_id', null)
+  return (attributed || 0) + (legacy || 0)
+}
+
+/* Wins available in each bucket right now (gross, before subtracting claims). */
+export async function getBucketWins(familyId, userId) {
+  const [daily, weekly, monthly] = await Promise.all([
+    countWinsSince(familyId, userId, periodStart('daily')),
+    countWinsSince(familyId, userId, periodStart('weekly')),
+    countWinsSince(familyId, userId, periodStart('monthly')),
+  ])
+  return { daily, weekly, monthly }
 }
 
 /* Lifetime wins — same attribution as countWinsThisWeek (this parent's
